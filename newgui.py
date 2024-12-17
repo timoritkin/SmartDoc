@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+import time
 import tkinter as tk
 from datetime import datetime
 from tkinter import messagebox, ttk
@@ -12,10 +13,11 @@ from tkcalendar import DateEntry
 from customtkinter import CTkImage
 
 hebrew_font = ("Arial", 16, "bold")
-padX_size = 10
+padX_size = (30, 30)
 padY_size = (0, 20)
 sticky_label = "w"
 sticky_entry = "e"
+borders_widgets = (30, 20)
 
 
 def resource_path(relative_path):
@@ -101,6 +103,7 @@ def create_docx(f_name, l_name, id_num, age, date, phone):
 
 
 def load_data(self):
+
     # Clear existing Treeview contents before inserting new data
     for item in self.treeview.get_children():
         self.treeview.delete(item)
@@ -121,7 +124,7 @@ class PatientForm:
     def __init__(self, root):
         self.root = root
         self.root.title("SmartDoc")
-        self.root.geometry("800x700")
+        self.root.geometry("900x700")
         self.root.iconbitmap("logo/logo_icon.ico")  # Provide the path to your .ico file
         self.root.configure(bg="#E8ECD7")  # Use a color name or hex code
 
@@ -134,31 +137,47 @@ class PatientForm:
         self.main_frame = ctk.CTkFrame(self.root)  # Use ctk.CTkFrame directly
         self.main_frame.grid(row=0, column=0, sticky="nsew")
 
+
         # Options frame (right side)
         self.options_frame = ctk.CTkFrame(self.root)  # Use ctk.CTkFrame directly
         self.options_frame.grid(row=0, column=1, sticky="ns")  # Stick to top and bottom
+        # Load an image using Pillow
+        image = Image.open("logo/SamartDoc.png")
+        ctk_image = CTkImage(light_image=image, size=(200, 200))
 
-        self.logo_label = ctk.CTkLabel(self.options_frame,
-                                       text="logo",
-                                       )
-        self.logo_label.pack(pady=(10, 150))
+        self.logo_label = ctk.CTkLabel(
+            self.options_frame,
+            image=ctk_image,
+            text=""  # Set text to an empty string to only show the image
+        )
+        self.logo_label.pack(pady=(0, 150))
         # Adding buttons to options_frame
         self.button1 = ctk.CTkButton(self.options_frame,
                                      text="חדש מטופל",
                                      width=200,
                                      height=40,
-                                     command=self.show_frame_1)
+                                     command=self.show_new_form)
         self.button1.pack(pady=10)
         self.button2 = ctk.CTkButton(self.options_frame,
                                      text="מטופל חיפוש",
                                      width=200,
                                      height=40,
-                                     command=self.show_frame_2)
+                                     command=self.show_search_frame)
         self.button2.pack(pady=10)
 
-        # Frames to be displayed in main_frame
-        self.new_form_frame = ctk.CTkFrame(self.main_frame, fg_color="lightblue")
+        self.parent_frame = ctk.CTkFrame(self.main_frame)  # Add a parent frame inside the main window
 
+
+        # To avoid multiple calls, we'll store the last resize time
+        self.last_resize_time = time.time()
+
+        self.new_form_frame = ctk.CTkFrame(
+            self.parent_frame,
+            fg_color="white",
+            corner_radius=25,
+            border_width=3,
+            border_color="gray"
+        )
         # Configure grid columns and rows to expand equally
         self.new_form_frame.grid_columnconfigure(0, weight=1, )  # Make column 0 expand
         self.new_form_frame.grid_columnconfigure(1, weight=1, )  # Make column 1 expand
@@ -166,14 +185,22 @@ class PatientForm:
 
         self.new_form_frame.grid_rowconfigure(6, weight=1, )  # Make row 6 expand
 
-        # Frame 1 widgets
+        # form widgets
+        self.frame_name_label = ctk.CTkLabel(
+            self.new_form_frame,
+            text="יצירת מטופל במערכת",
+            font=hebrew_font,
+            anchor="e"  # Right align the text
+        )
+        self.frame_name_label.grid(row=0, column=0, columnspan=2, padx=padX_size, pady=borders_widgets, sticky="we")
+
         self.f_name_label = ctk.CTkLabel(
             self.new_form_frame,
             text="שם פרטי",
             font=hebrew_font,
             anchor="e"  # Right align the text
         )
-        self.f_name_label.grid(row=1, column=1, padx=padX_size, pady=padY_size, sticky=sticky_label)
+        self.f_name_label.grid(row=1, column=1, padx=padX_size, pady=borders_widgets, sticky=sticky_label)
 
         self.f_name_entry = ctk.CTkEntry(
             self.new_form_frame,
@@ -181,7 +208,7 @@ class PatientForm:
             width=250,
             justify='right'
         )
-        self.f_name_entry.grid(row=1, column=0, padx=padX_size, pady=padY_size, sticky=sticky_entry)
+        self.f_name_entry.grid(row=1, column=0, padx=padX_size, pady=borders_widgets, sticky=sticky_entry)
 
         # Last Name
         self.l_name_label = ctk.CTkLabel(
@@ -261,24 +288,89 @@ class PatientForm:
                                            width=250,
                                            height=100,
                                            command=self.collect_data)
-        self.create_button.grid(row=6, column=0, padx=padX_size, pady=padY_size, sticky=sticky_entry)
+        self.create_button.grid(row=6, column=0, padx=padX_size, pady=(0, 30), sticky=sticky_entry)
 
-        self.frame_2 = ctk.CTkFrame(self.main_frame, fg_color="lightgreen")  # Use ctk.CTkFrame directly
-        self.frame_2_label = ctk.CTkLabel(self.frame_2, text="This is Frame 2", font=("Arial", 20))
-        self.frame_2_label.pack(pady=50)
+        self.search_frame = ctk.CTkFrame(self.main_frame, fg_color="lightgreen")  # Use ctk.CTkFrame directly
 
-        # Show the first frame by default
-        self.show_frame_1()
+        # Configure column weights to make the layout responsive
+        self.search_frame.columnconfigure(0, weight=1)  # Search button
+        self.search_frame.columnconfigure(1, weight=1)  # Search entry
+        self.search_frame.columnconfigure(2, weight=3)  # Label
+        self.search_frame.rowconfigure(1, weight=1)  # Make treeFrame's row expandable
 
-    def show_frame_1(self):
-        """Display Frame 1 and hide Frame 2"""
-        self.new_form_frame.pack(fill="both", expand=True)
-        self.frame_2.pack_forget()
+        self.search_label = ctk.CTkLabel(
+            self.search_frame,
+            text="חיפוש מטופל",
+            font=hebrew_font,
+            anchor="center"
+        )
+        self.search_label.grid(row=0, column=3, padx=10, pady=5, sticky='we')
 
-    def show_frame_2(self):
-        """Display Frame 2 and hide Frame 1"""
-        self.frame_2.pack(fill="both", expand=True)
+        self.search_entry = ctk.CTkEntry(
+            self.search_frame,
+            font=hebrew_font,
+
+            justify='right'
+        )
+        self.search_entry.grid(row=0, column=2, padx=10, pady=10, sticky='we')
+        self.search_entry.bind("<Return>", self.search_data)
+
+        # Search Button
+        self.search_button = ctk.CTkButton(self.search_frame,
+                                           text="חיפוש",
+                                           width=100,
+                                           command=self.search_data)
+        self.search_button.grid(row=0, column=1, sticky='we', padx=10, pady=10)
+
+        self.delete_button = ctk.CTkButton(self.search_frame,
+                                           text="איפוס",
+                                           width=100,
+                                           fg_color="red",
+                                           hover_color="#AF1740",
+                                           command=self.delete_search_data)
+        self.delete_button.grid(row=0, column=0, sticky='we', padx=10, pady=10)
+
+        self.treeFrame = ttk.Frame(self.search_frame)
+        self.treeFrame.grid(row=1, column=0, padx=10, pady=10, columnspan=4, sticky='nswe')
+
+        self.treeScroll = ttk.Scrollbar(self.treeFrame)
+        self.treeScroll.pack(side="right", fill="y")
+
+        cols = ("תאריך ביקור", "טלפון", "גיל", "שם פרטי", "שם משפחה", "תעודה מזהה")
+        self.treeview = ttk.Treeview(self.treeFrame, show="headings",
+                                     yscrollcommand=self.treeScroll.set, columns=cols, height=13)
+        # Configure each column
+        for col in cols:
+            # Set column heading with center alignment
+            self.treeview.heading(col, text=col, anchor="center")
+
+            # Set column width and data alignment
+            self.treeview.column(col, width=100, anchor="center")
+        # Bind the left-click event to the open_docx function
+        self.treeview.bind("<Double-1>", open_word_document)
+        # Bind the Enter key press event to the open_docx function
+        self.treeview.bind("<Return>", open_word_document)
+        self.treeScroll.config(command=self.treeview.yview)
+        self.treeview.pack(fill="both", expand=True)
+
+        load_data(self)
+
+        self.show_new_form()
+
+    def show_new_form(self):
+
+        self.parent_frame.pack(expand=True, fill="both", padx=20, pady=20)  # Make it responsive
+
+        self.new_form_frame.pack(expand=True, padx=50, pady=50)
+        self.search_frame.pack_forget()
+
+    def show_search_frame(self):
+
+        self.search_frame.pack(fill="both", expand=True)
         self.new_form_frame.pack_forget()
+        self.parent_frame.pack_forget()
+
+
 
     def calculate_age(self, birthdate_str):
 
@@ -298,6 +390,33 @@ class PatientForm:
             age -= 1
 
         return age
+
+    def delete_search_data(self):
+        self.search_entry.delete(0, tk.END)
+        self.search_data()
+
+    def search_data(self, event=None):
+        search_term = self.search_entry.get()
+
+        # Clear existing items in treeview
+        for item in self.treeview.get_children():
+            self.treeview.delete(item)
+
+        # Get search results from database
+        results = db.search_patients(search_term)
+
+        # Keep track of seen patient IDs to avoid duplicates
+        seen_patient_ids = set()
+
+        # Reinsert matching items with calculated ages
+        for row in results:
+            if row[-1] not in seen_patient_ids:  # Assuming patient ID is the last column
+                row_with_age = list(row)  # Convert the tuple to a list
+                birthdate_str = row[2]  # Assuming birthdate is the 3rd column
+                row_with_age[2] = self.calculate_age(birthdate_str)  # Replace birthdate with calculated age
+
+                self.treeview.insert('', 'end', values=row_with_age)
+                seen_patient_ids.add(row[-1])
 
     def collect_data(self):
         first_name = self.f_name_entry.get()
@@ -342,6 +461,7 @@ class PatientForm:
         self.l_name_entry.delete(0, tk.END)
         self.id_entry.delete(0, tk.END)
         self.phone_entry.delete(0, tk.END)
+        load_data(self)
 
 
 def main():
