@@ -1,0 +1,10 @@
+/build/
+/dist/
+*.spec
+# Ignore the main.exe file
+*.exe
+# Ignore all .db files
+*.db
+
+# Ignore the 'patient docx' folder
+patients docx/
