@@ -1,4 +1,3 @@
-
 import os
 import subprocess
 import sys
@@ -213,7 +212,7 @@ class PatientForm:
         padX_size = 10
         padX_age_size = 10
         # Load an image using Pillow
-        image = Image.open("logo/SamartDoc.png")
+        image = Image.open("logo/SmartDocLogo.png")
         ctk_image = CTkImage(light_image=image, size=(250, 150))
 
         self.logo_label = customtkinter.CTkLabel(

@@ -12,12 +12,15 @@ from PIL import Image
 from tkcalendar import DateEntry
 from customtkinter import CTkImage
 
+
 hebrew_font = ("Arial", 16, "bold")
 padX_size = (30, 30)
 padY_size = (0, 20)
 sticky_label = "w"
 sticky_entry = "e"
 borders_widgets = (30, 20)
+color1 = "#176B87"
+color2 = "#64CCC5"
 
 
 def resource_path(relative_path):
@@ -103,7 +106,6 @@ def create_docx(f_name, l_name, id_num, age, date, phone):
 
 
 def load_data(self):
-
     # Clear existing Treeview contents before inserting new data
     for item in self.treeview.get_children():
         self.treeview.delete(item)
@@ -126,24 +128,22 @@ class PatientForm:
         self.root.title("SmartDoc")
         self.root.geometry("900x700")
         self.root.iconbitmap("logo/logo_icon.ico")  # Provide the path to your .ico file
-        self.root.configure(bg="#E8ECD7")  # Use a color name or hex code
-
+        self.root.configure(bg=color1)  # Use a color name or hex code
         # Configure the grid layout for the window
         self.root.grid_columnconfigure(0, weight=1)  # Main frame will expand
         self.root.grid_columnconfigure(1, weight=0)  # Options frame stays fixed
         self.root.grid_rowconfigure(0, weight=1)  # Main frame will expand vertically
 
         # Main frame (left side)
-        self.main_frame = ctk.CTkFrame(self.root)  # Use ctk.CTkFrame directly
+        self.main_frame = ctk.CTkFrame(self.root, fg_color=color1)  # Use ctk.CTkFrame directly
         self.main_frame.grid(row=0, column=0, sticky="nsew")
 
-
         # Options frame (right side)
-        self.options_frame = ctk.CTkFrame(self.root)  # Use ctk.CTkFrame directly
+        self.options_frame = ctk.CTkFrame(self.root, fg_color=color2)  # Use ctk.CTkFrame directly
         self.options_frame.grid(row=0, column=1, sticky="ns")  # Stick to top and bottom
         # Load an image using Pillow
-        image = Image.open("logo/SamartDoc.png")
-        ctk_image = CTkImage(light_image=image, size=(200, 200))
+        image = Image.open("logo/SmartDocLogo.png")
+        ctk_image = CTkImage(light_image=image, size=(200, 100))
 
         self.logo_label = ctk.CTkLabel(
             self.options_frame,
@@ -165,24 +165,23 @@ class PatientForm:
                                      command=self.show_search_frame)
         self.button2.pack(pady=10)
 
-        self.parent_frame = ctk.CTkFrame(self.main_frame)  # Add a parent frame inside the main window
-
+        self.parent_frame = ctk.CTkFrame(self.main_frame, fg_color=color1)  # Add a parent frame inside the main window
 
         # To avoid multiple calls, we'll store the last resize time
         self.last_resize_time = time.time()
 
         self.new_form_frame = ctk.CTkFrame(
             self.parent_frame,
-            fg_color="white",
+            fg_color="#DEEEEA",
             corner_radius=25,
             border_width=3,
-            border_color="gray"
+            border_color="#4DBFE0"
         )
+
         # Configure grid columns and rows to expand equally
         self.new_form_frame.grid_columnconfigure(0, weight=1, )  # Make column 0 expand
         self.new_form_frame.grid_columnconfigure(1, weight=1, )  # Make column 1 expand
         self.new_form_frame.grid_rowconfigure(0, weight=1, )  # Make row 0 expand
-
         self.new_form_frame.grid_rowconfigure(6, weight=1, )  # Make row 6 expand
 
         # form widgets
@@ -290,7 +289,7 @@ class PatientForm:
                                            command=self.collect_data)
         self.create_button.grid(row=6, column=0, padx=padX_size, pady=(0, 30), sticky=sticky_entry)
 
-        self.search_frame = ctk.CTkFrame(self.main_frame, fg_color="lightgreen")  # Use ctk.CTkFrame directly
+        self.search_frame = ctk.CTkFrame(self.main_frame, fg_color=color1)  # Use ctk.CTkFrame directly
 
         # Configure column weights to make the layout responsive
         self.search_frame.columnconfigure(0, weight=1)  # Search button
@@ -335,10 +334,23 @@ class PatientForm:
 
         self.treeScroll = ttk.Scrollbar(self.treeFrame)
         self.treeScroll.pack(side="right", fill="y")
+        self.treeViewStyle= ttk.Style()
+        self.treeViewStyle.configure("Custom.Treeview",
+                                     font=("Arial ", 12))
+        # Configure the style for the headings with a larger font
+        self.treeViewStyle.configure("Custom.Treeview.Heading",
+                                     font=("Arial", 14, "bold"))  # Font for headings
 
         cols = ("תאריך ביקור", "טלפון", "גיל", "שם פרטי", "שם משפחה", "תעודה מזהה")
-        self.treeview = ttk.Treeview(self.treeFrame, show="headings",
-                                     yscrollcommand=self.treeScroll.set, columns=cols, height=13)
+        self.treeview = ttk.Treeview(self.treeFrame,
+                                     show="headings",
+                                     yscrollcommand=self.treeScroll.set,
+                                     columns=cols,
+                                     height=13,
+                                     style="Custom.Treeview")
+
+
+
         # Configure each column
         for col in cols:
             # Set column heading with center alignment
@@ -369,8 +381,6 @@ class PatientForm:
         self.search_frame.pack(fill="both", expand=True)
         self.new_form_frame.pack_forget()
         self.parent_frame.pack_forget()
-
-
 
     def calculate_age(self, birthdate_str):
 
@@ -467,7 +477,7 @@ class PatientForm:
 def main():
     # Call the function to create the tables
     db.create_tables()
-    root = ctk.CTk()  # create CTk window like you do with the Tk window
+    root = ctk.CTk(fg_color=color1)  # create CTk window like you do with the Tk window
     PatientForm(root)
     root.mainloop()
 
