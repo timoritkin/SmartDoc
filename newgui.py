@@ -12,7 +12,6 @@ from PIL import Image
 from tkcalendar import DateEntry
 from customtkinter import CTkImage
 
-
 hebrew_font = ("Arial", 16, "bold")
 padX_size = (30, 30)
 padY_size = (0, 20)
@@ -124,6 +123,7 @@ def load_data(self):
 class PatientForm:
 
     def __init__(self, root):
+        self.current_frame = None  # Variable to keep track of the currently displayed frame
         self.root = root
         self.root.title("SmartDoc")
         self.root.geometry("900x700")
@@ -133,6 +133,7 @@ class PatientForm:
         self.root.grid_columnconfigure(0, weight=1)  # Main frame will expand
         self.root.grid_columnconfigure(1, weight=0)  # Options frame stays fixed
         self.root.grid_rowconfigure(0, weight=1)  # Main frame will expand vertically
+        self.frames = {}  # Dictionary to store all frames
 
         # Main frame (left side)
         self.main_frame = ctk.CTkFrame(self.root, fg_color=color1)  # Use ctk.CTkFrame directly
@@ -141,6 +142,25 @@ class PatientForm:
         # Options frame (right side)
         self.options_frame = ctk.CTkFrame(self.root, fg_color=color2)  # Use ctk.CTkFrame directly
         self.options_frame.grid(row=0, column=1, sticky="ns")  # Stick to top and bottom
+
+        self.parent_frame = ctk.CTkFrame(self.main_frame, fg_color=color1)  # Add a parent frame inside the main window
+
+        self.new_form_frame = ctk.CTkFrame(
+            self.parent_frame,
+            fg_color="#DEEEEA",
+            corner_radius=25,
+            border_width=3,
+            border_color="#4DBFE0"
+        )
+        self.search_visits_frame = ctk.CTkFrame(self.main_frame, fg_color=color1)  # Use ctk.CTkFrame directly
+
+        # in this frame the user will create new visit of existed patient in db
+        self.create_visit_frame = ctk.CTkFrame(self.main_frame, fg_color=color1)  # Use ctk.CTkFrame directly
+
+        self.frames['new_form'] = self.new_form_frame
+        self.frames['search_visits'] = self.search_visits_frame
+        self.frames['create_visit'] = self.create_visit_frame
+
         # Load an image using Pillow
         image = Image.open("logo/SmartDocLogo.png")
         ctk_image = CTkImage(light_image=image, size=(200, 100))
@@ -162,21 +182,18 @@ class PatientForm:
                                      text="מטופל חיפוש",
                                      width=200,
                                      height=40,
-                                     command=self.show_search_frame)
+                                     command=self.show_create_visits_frame())
         self.button2.pack(pady=10)
 
-        self.parent_frame = ctk.CTkFrame(self.main_frame, fg_color=color1)  # Add a parent frame inside the main window
+        self.button3 = ctk.CTkButton(self.options_frame,
+                                     text="ביקור חיפוש",
+                                     width=200,
+                                     height=40,
+                                     command=self.show_visits_frame())
+        self.button3.pack(pady=10)
 
         # To avoid multiple calls, we'll store the last resize time
         self.last_resize_time = time.time()
-
-        self.new_form_frame = ctk.CTkFrame(
-            self.parent_frame,
-            fg_color="#DEEEEA",
-            corner_radius=25,
-            border_width=3,
-            border_color="#4DBFE0"
-        )
 
         # Configure grid columns and rows to expand equally
         self.new_form_frame.grid_columnconfigure(0, weight=1, )  # Make column 0 expand
@@ -289,24 +306,23 @@ class PatientForm:
                                            command=self.collect_data)
         self.create_button.grid(row=6, column=0, padx=padX_size, pady=(0, 30), sticky=sticky_entry)
 
-        self.search_frame = ctk.CTkFrame(self.main_frame, fg_color=color1)  # Use ctk.CTkFrame directly
-
         # Configure column weights to make the layout responsive
-        self.search_frame.columnconfigure(0, weight=1)  # Search button
-        self.search_frame.columnconfigure(1, weight=1)  # Search entry
-        self.search_frame.columnconfigure(2, weight=3)  # Label
-        self.search_frame.rowconfigure(1, weight=1)  # Make treeFrame's row expandable
+        self.search_visits_frame.columnconfigure(0, weight=1)  # Search button
+        self.search_visits_frame.columnconfigure(1, weight=1)  # Search entry
+        self.search_visits_frame.columnconfigure(2, weight=3)  # Label
+        self.search_visits_frame.rowconfigure(1, weight=1)  # Make treeFrame's row expandable
 
         self.search_label = ctk.CTkLabel(
-            self.search_frame,
-            text="חיפוש מטופל",
+            self.search_visits_frame,
+            text="חיפוש ביקור",
             font=hebrew_font,
-            anchor="center"
+            anchor="center",
+            text_color="#F8FAFC"
         )
         self.search_label.grid(row=0, column=3, padx=10, pady=5, sticky='we')
 
         self.search_entry = ctk.CTkEntry(
-            self.search_frame,
+            self.search_visits_frame,
             font=hebrew_font,
 
             justify='right'
@@ -315,13 +331,15 @@ class PatientForm:
         self.search_entry.bind("<Return>", self.search_data)
 
         # Search Button
-        self.search_button = ctk.CTkButton(self.search_frame,
+        self.search_button = ctk.CTkButton(self.search_visits_frame,
                                            text="חיפוש",
                                            width=100,
-                                           command=self.search_data)
+                                           command=self.search_data,
+                                           fg_color="#5CB338",
+                                           hover_color="#118B50")
         self.search_button.grid(row=0, column=1, sticky='we', padx=10, pady=10)
 
-        self.delete_button = ctk.CTkButton(self.search_frame,
+        self.delete_button = ctk.CTkButton(self.search_visits_frame,
                                            text="איפוס",
                                            width=100,
                                            fg_color="red",
@@ -329,12 +347,12 @@ class PatientForm:
                                            command=self.delete_search_data)
         self.delete_button.grid(row=0, column=0, sticky='we', padx=10, pady=10)
 
-        self.treeFrame = ttk.Frame(self.search_frame)
+        self.treeFrame = ttk.Frame(self.search_visits_frame)
         self.treeFrame.grid(row=1, column=0, padx=10, pady=10, columnspan=4, sticky='nswe')
 
         self.treeScroll = ttk.Scrollbar(self.treeFrame)
         self.treeScroll.pack(side="right", fill="y")
-        self.treeViewStyle= ttk.Style()
+        self.treeViewStyle = ttk.Style()
         self.treeViewStyle.configure("Custom.Treeview",
                                      font=("Arial ", 12))
         # Configure the style for the headings with a larger font
@@ -348,8 +366,6 @@ class PatientForm:
                                      columns=cols,
                                      height=13,
                                      style="Custom.Treeview")
-
-
 
         # Configure each column
         for col in cols:
@@ -365,22 +381,64 @@ class PatientForm:
         self.treeScroll.config(command=self.treeview.yview)
         self.treeview.pack(fill="both", expand=True)
 
+        self.search_label = ctk.CTkLabel(
+            self.create_visit_frame,
+            text="חיפוש ביקור",
+            font=hebrew_font,
+            anchor="center",
+            text_color="#F8FAFC"
+        )
+        self.search_label.grid(row=0, column=3, padx=10, pady=5, sticky='we')
+
+        self.search_entry = ctk.CTkEntry(
+            self.create_visit_frame,
+            font=hebrew_font,
+
+            justify='right'
+        )
+        self.search_entry.grid(row=0, column=2, padx=10, pady=10, sticky='we')
+        self.search_entry.bind("<Return>", self.search_data)
+
+        # Search Button
+        self.search_button = ctk.CTkButton(self.create_visit_frame,
+                                           text="חיפוש",
+                                           width=100,
+                                           command=self.search_data,
+                                           fg_color="#5CB338",
+                                           hover_color="#118B50")
+        self.search_button.grid(row=0, column=1, sticky='we', padx=10, pady=10)
+
         load_data(self)
 
+        # Set the current_frame as a string (default to 'new_form')
+        self.current_frame = 'new_form'
         self.show_new_form()
 
+    def show_frame(self, frame_name):
+        # Hide the current frame if there is one
+        if self.current_frame:
+            self.frames[self.current_frame].pack_forget()
+
+        # Show the selected frame
+        frame = self.frames.get(frame_name)
+        if frame:
+            if frame =='new_form':
+                self.parent_frame.pack(fill="both", expand=True, padx=20, pady=20)
+            frame.pack(fill="both", expand=True, padx=20, pady=20)
+            self.current_frame = frame_name  # Update the currently displayed frame
+
     def show_new_form(self):
+        self.show_frame('new_form')
 
-        self.parent_frame.pack(expand=True, fill="both", padx=20, pady=20)  # Make it responsive
+    def show_visits_frame(self):
+        self.show_frame('search_visits')
 
-        self.new_form_frame.pack(expand=True, padx=50, pady=50)
-        self.search_frame.pack_forget()
+    def show_create_visits_frame(self):
+        self.show_frame('create_visit')
 
-    def show_search_frame(self):
 
-        self.search_frame.pack(fill="both", expand=True)
-        self.new_form_frame.pack_forget()
-        self.parent_frame.pack_forget()
+    def get_current_frame(self):
+        return self.current_frame  # Return the name of the currently displayed frame
 
     def calculate_age(self, birthdate_str):
 
