@@ -96,18 +96,18 @@ def create_docx(f_name, l_name, id_num, age, date, phone):
 
 def load_data(self):
     # Clear existing Treeview contents before inserting new data
-    for item in self.treeview.get_children():
-        self.treeview.delete(item)
+    for item in self.visit_treeview.get_children():
+        self.visit_treeview.delete(item)
 
     # Fetch data and populate the Treeview
-    rows = db.fetch_data()
+    rows = db.fetch_visit_data()
 
     for row in rows:
         birthdate_str = row[2]  # Example: row[2] is the birthdate column in 'dd/mm/yyyy' format
         age = self.calculate_age(birthdate_str)
         row_with_replaced_age = list(row)  # Convert the tuple to a list
         row_with_replaced_age[2] = age  # Assuming the Age column is at index 2
-        self.treeview.insert("", tk.END, values=row_with_replaced_age)
+        self.visit_treeview.insert("", tk.END, values=row_with_replaced_age)
 
 
 class PatientForm:
@@ -157,7 +157,7 @@ class PatientForm:
     def search_data(self, event=None):
         search_term = self.search_entry.get()
 
-        # Clear existing items in treeview
+        # Clear existing items in visit_treeview
         for item in self.treeview.get_children():
             self.treeview.delete(item)
 
@@ -179,7 +179,7 @@ class PatientForm:
     def create_patient_info_tab(self):
         search_term = self.search_entry.get()
 
-        # Clear existing items in treeview
+        # Clear existing items in visit_treeview
         for item in self.patient_tree.get_children():
             self.patient_tree.delete(item)
 
@@ -433,13 +433,12 @@ class PatientForm:
         current_date = datetime.now().strftime('%d-%m-%Y')  # Use hyphens instead of slashes
         age = self.calculate_age(birth_date)
 
-        docx = create_docx(first_name, last_name, ID, age, current_date, phone)
         if db.check_patient_id_exists(ID):
-            db.insert_visit_record(ID, current_date, docx)
+            messagebox.showwarning("שגיאת קלט", "המטופל כבר קיים במערכת")
         else:
+            docx = create_docx(first_name, last_name, ID, age, current_date, phone)
             db.insert_patient_record(first_name, last_name, ID, birth_date, phone)
             db.insert_visit_record(ID, current_date, docx)
-
         # Clear all entry widgets
         self.f_name_entry.delete(0, tk.END)
         self.l_name_entry.delete(0, tk.END)

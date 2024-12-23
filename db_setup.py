@@ -15,14 +15,13 @@ def create_tables():
         # If the table doesn't exist, create it
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS patients (
-            patient_id TEXT PRIMARY KEY,
-            first_name TEXT NOT NULL,
-            last_name TEXT NOT NULL,
-            birthdate TEXT NOT NULL,
-            phone_number TEXT 
+            patient_id INTEGER PRIMARY KEY,
+            first_name VARCHAR  (50) NOT NULL,
+            last_name VARCHAR (50) NOT NULL,
+            birthdate VARCHAR (11) NOT NULL,
+            phone_number VARCHAR (10) NOT NULL 
         )
         """)
-
 
     # Check if the 'visits' table already exists
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='visits'")
@@ -31,10 +30,11 @@ def create_tables():
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS visits (
             visit_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            patient_id TEXT NOT NULL,
-            visit_date TEXT NOT NULL,
+            patient_id INTEGER NOT NULL,
+            visit_date VARCHAR (11) NOT NULL,
             docx_path TEXT NOT NULL,
             FOREIGN KEY (patient_id) REFERENCES patients(patient_id)
+            ON DELETE CASCADE ON UPDATE CASCADE -- Maintain referential integrity
             
         )
         """)
@@ -44,7 +44,7 @@ def create_tables():
     conn.close()
 
 
-def fetch_data():
+def fetch_visit_data():
     """Fetch data from the SQLite database."""
     conn = sqlite3.connect("patients.db")
     cursor = conn.cursor()
@@ -58,6 +58,23 @@ def fetch_data():
     cursor.execute(query)
     rows = cursor.fetchall()
 
+    conn.close()
+    return rows
+
+
+def fetch_patient_data():
+    """Fetch data from the SQLite database."""
+    conn = sqlite3.connect("patients.db")
+    cursor = conn.cursor()
+
+    # Query to fetch patient and visit details (without docx_path)
+    query = """
+        SELECT p.phone_number, p.birthdate,  p.first_name,p.last_name, p.patient_id
+        FROM patients p
+       
+    """
+    cursor.execute(query)
+    rows = cursor.fetchall()
 
     conn.close()
     return rows
@@ -129,8 +146,6 @@ def get_docx_path(patient_id, visit_date):
     if visit_date:
         query += " AND visit_date = ?"
         params.append(visit_date)
-
-
 
     # Execute the query
     cursor.execute(query, params)
