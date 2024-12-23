@@ -58,6 +58,7 @@ def fetch_visit_data():
     cursor.execute(query)
     rows = cursor.fetchall()
 
+    conn.commit()
     conn.close()
     return rows
 
@@ -76,25 +77,27 @@ def fetch_patient_data():
     cursor.execute(query)
     rows = cursor.fetchall()
 
+    conn.commit()
     conn.close()
     return rows
 
 
-def insert_visit_record(patient_id, time, docx_path):
-    # Connect to the SQLite database
-    conn = sqlite3.connect("patients.db")
+def insert_visit_record(ID, current_date, docx_path):
+    conn = sqlite3.connect('patients.db')
     cursor = conn.cursor()
 
-    # Insert the patient record into the patients table
-    cursor.execute("""
-        INSERT INTO visits (patient_id, visit_date, docx_path)
-        VALUES (?, ?, ?)
-        """, (patient_id, time, docx_path,))
+    try:
+        # Your insert logic here
+        cursor.execute("INSERT INTO visits (patient_id, visit_date, docx_path) VALUES (?, ?, ?)",
+                       (ID, current_date, docx_path))
 
-    # Commit the changes and close the connection
-    conn.commit()
-    conn.close()
-
+        # Commit the transaction
+        conn.commit()
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        # Ensure the connection is closed
+        conn.close()
 
 def insert_patient_record(first_name, last_name, patient_id, birthdate, phone):
     """
@@ -153,6 +156,7 @@ def get_docx_path(patient_id, visit_date):
     # Fetch the result
     result = cursor.fetchone()
 
+    conn.commit()
     # Close the connection
     conn.close()
 
@@ -195,6 +199,7 @@ def search_patients(search_term):
     # Fetch and process results
     results = cursor.fetchall()
 
+    conn.commit()
     conn.close()
 
     return results
@@ -215,6 +220,7 @@ def check_patient_id_exists(patient_id):
     # Fetch one result; if no result is found, None will be returned
     result = cursor.fetchone()
 
+    conn.commit()
     # Close the connection
     conn.close()
 

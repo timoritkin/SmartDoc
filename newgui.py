@@ -33,24 +33,20 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
+# Get the selected item
 def open_word_document(event):
     # Get the selected item
     selected_item = event.widget.selection()
     if not selected_item:
         return
-
-    # Retrieve file information
     p_id = event.widget.item(selected_item, 'values')[5]
+    # Retrieve file information
     visit_date = event.widget.item(selected_item, 'values')[0]
-
-    # Get the document path from the database (adjust `db.get_docx_path` if necessary)
     path = db.get_docx_path(p_id, visit_date)
-
-    # Resolve the full path for bundled environments
+    # Get the document path from the database (adjust `db.get_docx_path` if necessary)
     if path:
         path = resource_path(path)
-
-    # Check if the file exists before attempting to open it
+    # Resolve the full path for bundled environments
     if path and os.path.exists(path):
         try:
             # Use the default application to open the file
@@ -66,10 +62,16 @@ def open_word_document(event):
         messagebox.showwarning("Warning", "הקובץ לא נמצא")
 
 
-def create_docx(f_name, l_name, id_num, age, date, phone):
+# Check if the file exists before attempting to open it
+
+
+def create_docx(f_name, l_name, id_num, age, phone):
     # Load the template using resource_path
     template_path = resource_path('template/Clalit mushlam template.docx')
     doc = DocxTemplate(template_path)
+
+    # Get the current date in the desired format (e.g., dd-mm-yyyy)
+    date = datetime.now().strftime('%d-%m-%Y')  # Use hyphens instead of slashes
 
     # Define the folder name for saving documents
     folder_name = 'patients docx'
@@ -104,6 +106,53 @@ def create_docx(f_name, l_name, id_num, age, date, phone):
     return file_path
 
 
+# user will be asked if they want to create new visit as a result new doc will be created
+def create_new_visit(event, tree):
+    # Get the selected row (item) that was double-clicked
+    selected_item = tree.selection()
+
+    if selected_item:  # If an item is selected
+        # Get the data (values) of the selected row
+        item_data = tree.item(selected_item[0])["values"]
+        # Get the current date in the desired format (e.g., dd-mm-yyyy)
+        current_date = datetime.now().strftime('%d-%m-%Y')  # Use hyphens instead of slashes
+
+        # Create a new window (pop-up)
+        popup = tk.Toplevel()
+        popup.title("Pop-up Window")
+        # Prevent the window from being resized
+        popup.resizable(False, False)
+        popup_frame = ctk.CTkFrame(popup, fg_color=color1)  # Use ctk.CTkFrame directly
+        print(item_data[4])
+        # Last Name
+        question_label = ctk.CTkLabel(
+            popup_frame,
+            text=f"? האם ליצור עבור המטופל {item_data[2]} {item_data[3]} ביקור חדש ",
+            font=hebrew_font,
+            anchor="e"
+        )
+        question_label.grid(row=0, column=0, columnspan=2, padx=padX_size, pady=padY_size, sticky='nswe')
+
+        confirm_button = ctk.CTkButton(popup_frame,
+                                       text="אישור",
+                                       width=100,
+                                       command=lambda: ((docx_path := create_docx(item_data[2], item_data[3],
+                                                                                  item_data[4], item_data[1],
+                                                                                  item_data[0])),
+                                                        db.insert_visit_record(item_data[4], current_date, docx_path)))
+
+        confirm_button.grid(row=1, column=1, sticky='we', padx=10, pady=10)
+
+        denied_button = ctk.CTkButton(popup_frame,
+                                      text="ביטול",
+                                      width=100,
+                                      fg_color="red",
+                                      hover_color="#AF1740",
+                                      command=popup.destroy)
+        denied_button.grid(row=1, column=0, sticky='we', padx=10, pady=10)
+        popup_frame.grid(row=0, column=0, sticky="nsew")
+
+
 def load_visit_data(self):
     # Clear existing Treeview contents before inserting new data
     for item in self.visit_treeview.get_children():
@@ -114,7 +163,7 @@ def load_visit_data(self):
 
     for row in rows:
         birthdate_str = row[2]  # Example: row[2] is the birthdate column in 'dd/mm/yyyy' format
-        age = self.calculate_age(birthdate_str)
+        age = calculate_age(birthdate_str)
         row_with_replaced_age = list(row)  # Convert the tuple to a list
         row_with_replaced_age[2] = age  # Assuming the Age column is at index 2
         self.visit_treeview.insert("", tk.END, values=row_with_replaced_age)
@@ -130,10 +179,29 @@ def load_patient_data(self):
 
     for row in rows:
         birthdate_str = row[1]  # Example: row[2] is the birthdate column in 'dd/mm/yyyy' format
-        age = self.calculate_age(birthdate_str)
+        age = calculate_age(birthdate_str)
         row_with_replaced_age = list(row)  # Convert the tuple to a list
         row_with_replaced_age[1] = age  # Assuming the Age column is at index 2
         self.patients_treeview.insert("", tk.END, values=row_with_replaced_age)
+
+
+def calculate_age(birthdate_str):
+    try:
+        # Parse the birthdate string
+        birthdate = datetime.strptime(birthdate_str, '%d/%m/%Y')
+    except ValueError:
+        return None
+
+    # Calculate the current age
+    current_date = datetime.today()
+    age = current_date.year - birthdate.year
+
+    # Adjust for birthday not yet occurring this year
+    if current_date.month < birthdate.month or (
+            current_date.month == birthdate.month and current_date.day < birthdate.day):
+        age -= 1
+
+    return age
 
 
 class PatientForm:
@@ -377,6 +445,10 @@ class PatientForm:
             # Set column width and data alignment
             self.patients_treeview.column(col, width=100, anchor="center")
 
+        # Bind the left-click event to the open_docx function
+        self.patients_treeview.bind("<Double-1>", lambda event: create_new_visit(event, self.patients_treeview))
+        # Bind the Enter key press event to the open_docx function
+        self.patients_treeview.bind("<Return>", lambda event: create_new_visit(event, self.patients_treeview))
         self.treeScroll.config(command=self.patients_treeview.yview)
         self.patients_treeview.pack(fill="both", expand=True)
 
@@ -482,25 +554,6 @@ class PatientForm:
             self.parent_new_form_frame.pack_forget()
             self.current_frame = self.search_patients_frame
 
-    def calculate_age(self, birthdate_str):
-
-        try:
-            # Parse the birthdate string
-            birthdate = datetime.strptime(birthdate_str, '%d/%m/%Y')
-        except ValueError:
-            return None
-
-        # Calculate the current age
-        current_date = datetime.today()
-        age = current_date.year - birthdate.year
-
-        # Adjust for birthday not yet occurring this year
-        if current_date.month < birthdate.month or (
-                current_date.month == birthdate.month and current_date.day < birthdate.day):
-            age -= 1
-
-        return age
-
     def delete_search_data(self):
         self.search_entry.delete(0, tk.END)
         self.search_data()
@@ -519,7 +572,7 @@ class PatientForm:
         for row in results:
             row_with_age = list(row)  # Convert the tuple to a list
             birthdate_str = row[2]  # Assuming birthdate is the 3rd column
-            row_with_age[2] = self.calculate_age(birthdate_str)  # Replace birthdate with calculated age
+            row_with_age[2] = calculate_age(birthdate_str)  # Replace birthdate with calculated age
 
             self.visit_treeview.insert('', 'end', values=row_with_age)
 
@@ -552,11 +605,12 @@ class PatientForm:
 
         # Get the current date in the desired format (e.g., dd-mm-yyyy)
         current_date = datetime.now().strftime('%d-%m-%Y')  # Use hyphens instead of slashes
-        age = self.calculate_age(birth_date)
+
+        age = calculate_age(birth_date)
         if db.check_patient_id_exists(ID):
             messagebox.showwarning("שגיאת קלט", "המטופל כבר קיים במערכת")
         else:
-            docx = create_docx(first_name, last_name, ID, age, current_date, phone)
+            docx = create_docx(first_name, last_name, ID, age, phone)
             db.insert_patient_record(first_name, last_name, ID, birth_date, phone)
             db.insert_visit_record(ID, current_date, docx)
 
@@ -567,6 +621,7 @@ class PatientForm:
         self.phone_entry.delete(0, tk.END)
         load_visit_data(self)
         load_patient_data(self)
+
 
 def main():
     # Call the function to create the tables

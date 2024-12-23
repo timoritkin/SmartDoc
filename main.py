@@ -1,15 +1,25 @@
 import os
 import subprocess
 import sys
+import time
 import tkinter as tk
 from datetime import datetime
 from tkinter import messagebox, ttk
 from docxtpl import DocxTemplate
 import db_setup as db
-import customtkinter
+import customtkinter as ctk
 from PIL import Image
 from tkcalendar import DateEntry
 from customtkinter import CTkImage
+
+hebrew_font = ("Arial", 16, "bold")
+padX_size = (30, 30)
+padY_size = (0, 20)
+sticky_label = "w"
+sticky_entry = "e"
+borders_widgets = (30, 20)
+color1 = "#176B87"
+color2 = "#64CCC5"
 
 
 def resource_path(relative_path):
@@ -94,7 +104,7 @@ def create_docx(f_name, l_name, id_num, age, date, phone):
     return file_path
 
 
-def load_data(self):
+def load_visit_data(self):
     # Clear existing Treeview contents before inserting new data
     for item in self.visit_treeview.get_children():
         self.visit_treeview.delete(item)
@@ -104,234 +114,221 @@ def load_data(self):
 
     for row in rows:
         birthdate_str = row[2]  # Example: row[2] is the birthdate column in 'dd/mm/yyyy' format
-        age = self.calculate_age(birthdate_str)
+        age = calculate_age(birthdate_str)
         row_with_replaced_age = list(row)  # Convert the tuple to a list
         row_with_replaced_age[2] = age  # Assuming the Age column is at index 2
         self.visit_treeview.insert("", tk.END, values=row_with_replaced_age)
 
 
+def load_patient_data(self):
+    # Clear existing Treeview contents before inserting new data
+    for item in self.patients_treeview.get_children():
+        self.patients_treeview.delete(item)
+
+    # Fetch data and populate the Treeview
+    rows = db.fetch_patient_data()
+
+    for row in rows:
+        birthdate_str = row[1]  # Example: row[2] is the birthdate column in 'dd/mm/yyyy' format
+        age = calculate_age(birthdate_str)
+        row_with_replaced_age = list(row)  # Convert the tuple to a list
+        row_with_replaced_age[1] = age  # Assuming the Age column is at index 2
+        self.patients_treeview.insert("", tk.END, values=row_with_replaced_age)
+
+
 class PatientForm:
 
     def __init__(self, root):
-        self.birth_date = None
-        self.delete_button = None
-        self.create_button = None
-        self.treeview = None
-        self.search_entry = None
-        self.file_listbox = None
-        self.search_label = None
-        self.search_button = None
-        self.age_entry = None
-        self.age_label = None
-        self.id_label = None
-        self.id_entry = None
-        self.l_name_entry = None
-        self.l_name_label = None
-        self.f_name_entry = None
-        self.f_name_label = None
-        self.original_treeview_data = []
         self.root = root
-        self.style = ttk.Style(root)
-        # self.root.call("source", "forest-light.tcl")
-        # self.style.theme_use("forest-light")
-
         self.root.title("SmartDoc")
+        self.root.geometry("900x700")
         self.root.iconbitmap("logo/logo_icon.ico")  # Provide the path to your .ico file
-        self.root.configure(bg="#E8ECD7")  # Use a color name or hex code
+        self.root.configure(bg=color1)  # Use a color name or hex code
+        # Configure the grid layout for the window
+        self.root.grid_columnconfigure(0, weight=1)  # Main frame will expand
+        self.root.grid_columnconfigure(1, weight=0)  # Options frame stays fixed
+        self.root.grid_rowconfigure(0, weight=1)  # Main frame will expand vertically
+        # Main frame (left side)
+        self.main_frame = ctk.CTkFrame(self.root, fg_color=color1)  # Use ctk.CTkFrame directly
+        self.main_frame.grid(row=0, column=0, sticky="nsew")
 
-        # Tab Control Setup
-        self.tab_control = customtkinter.CTkTabview(root, fg_color="#E8ECD7")
-
-        # Add tabs with Hebrew names
-        self.patient_tab = self.tab_control.add('המטופל פרטי')
-
-        self.search_tab = self.tab_control.add('מטופל חיפוש')
-
-        # Pack the Tab Control with proper expansion
-        self.tab_control.pack(expand=True, fill="both", padx=10, pady=5)
-
-        # Configure tabs
-        self.create_patient_info_tab()
-        self.create_search_tab()
-
-    def search_data(self, event=None):
-        search_term = self.search_entry.get()
-
-        # Clear existing items in visit_treeview
-        for item in self.treeview.get_children():
-            self.treeview.delete(item)
-
-        # Get search results from database
-        results = db.search_patients(search_term)
-
-        # Keep track of seen patient IDs to avoid duplicates
-        seen_patient_ids = set()
-
-        # Reinsert matching items
-        for row in results:
-            self.treeview.insert('', 'end', values=row)
-            seen_patient_ids.add(row[-1])
-
-        # Optional: Show a message if no results found
-        if len(seen_patient_ids) == 0:
-            messagebox.showinfo("Search Results", "No matching records found.")
-
-    def create_patient_info_tab(self):
-        search_term = self.search_entry.get()
-
-        # Clear existing items in visit_treeview
-        for item in self.patient_tree.get_children():
-            self.patient_tree.delete(item)
-
-        # Get search results from database
-        results = db.search_patients(search_term)
-
-        # Keep track of seen patient IDs to avoid duplicates
-        seen_patient_ids = set()
-
-        # Reinsert matching items
-        for row in results:
-            # If this patient hasn't been seen before, insert the row
-            if row[-1] not in seen_patient_ids:
-                self.treeview.insert('', 'end', values=row)
-                seen_patient_ids.add(row[-1])
-
-        # Optional: Show a message if no results found
-        if len(seen_patient_ids) == 0:
-            messagebox.showinfo("Search Results", "No matching records found.")
-
-    def create_patient_info_tab(self):
-        # Configure grid for proper layout
-        self.patient_tab.grid_rowconfigure(0, weight=1)  # Allocate space for the label
-        self.patient_tab.grid_columnconfigure(0, weight=1)  # Adjust columns
-        self.patient_tab.grid_columnconfigure(1, weight=1)  # Adjust columns
-        self.patient_tab.grid_rowconfigure(6, weight=1)  # Adjust columns
-
-        # Set a Hebrew-friendly font
-        hebrew_font = ("Arial", 14)
-        padX_size = 10
-        padX_age_size = 10
+        # Options frame (right side)
+        self.options_frame = ctk.CTkFrame(self.root, fg_color=color2)  # Use ctk.CTkFrame directly
+        self.options_frame.grid(row=0, column=1, sticky="ns")  # Stick to top and bottom
         # Load an image using Pillow
         image = Image.open("logo/SmartDocLogo.png")
-        ctk_image = CTkImage(light_image=image, size=(250, 150))
+        ctk_image = CTkImage(light_image=image, size=(200, 100))
 
-        self.logo_label = customtkinter.CTkLabel(
-            self.patient_tab,
+        self.logo_label = ctk.CTkLabel(
+            self.options_frame,
             image=ctk_image,
             text=""  # Set text to an empty string to only show the image
         )
+        self.logo_label.pack(pady=(0, 150))
+        # Adding buttons to options_frame
+        self.button1 = ctk.CTkButton(self.options_frame,
+                                     text="חדש מטופל",
+                                     width=200,
+                                     height=40,
+                                     command=self.show_new_form)
+        self.button1.pack(pady=10)
+        self.button2 = ctk.CTkButton(self.options_frame,
+                                     text="ביקור חיפוש",
+                                     width=200,
+                                     height=40,
+                                     command=self.show_visits_search_frame)
+        self.button2.pack(pady=10)
 
-        self.logo_label.grid(row=0, column=0, columnspan=2)
-        # Hebrew Labels and Entries with right alignment
-        # First Name
-        self.f_name_label = customtkinter.CTkLabel(
-            self.patient_tab,
+        self.button3 = ctk.CTkButton(self.options_frame,
+                                     text="מטופל חיפוש",
+                                     width=200,
+                                     height=40,
+                                     command=self.show_patients_search_frame)
+        self.button3.pack(pady=10)
+
+        self.parent_new_form_frame = ctk.CTkFrame(self.main_frame,
+                                                  fg_color=color1)  # Add a parent frame inside the main window
+
+        # To avoid multiple calls, we'll store the last resize time
+        self.last_resize_time = time.time()
+
+        self.new_form_frame = ctk.CTkFrame(
+            self.parent_new_form_frame,
+            fg_color="#DEEEEA",
+            corner_radius=25,
+            border_width=3,
+            border_color="#4DBFE0"
+        )
+        self.current_frame = self.new_form_frame
+        # Configure grid columns and rows to expand equally
+        self.new_form_frame.grid_columnconfigure(0, weight=1, )  # Make column 0 expand
+        self.new_form_frame.grid_columnconfigure(1, weight=1, )  # Make column 1 expand
+        self.new_form_frame.grid_rowconfigure(0, weight=1, )  # Make row 0 expand
+        self.new_form_frame.grid_rowconfigure(6, weight=1, )  # Make row 6 expand
+
+        # form widgets
+        self.frame_name_label = ctk.CTkLabel(
+            self.new_form_frame,
+            text="יצירת מטופל במערכת",
+            font=hebrew_font,
+            anchor="e"  # Right align the text
+        )
+        self.frame_name_label.grid(row=0, column=0, columnspan=2, padx=padX_size, pady=borders_widgets, sticky="we")
+
+        self.f_name_label = ctk.CTkLabel(
+            self.new_form_frame,
             text="שם פרטי",
             font=hebrew_font,
             anchor="e"  # Right align the text
         )
-        self.f_name_label.grid(row=1, column=1, padx=10, pady=5, sticky='w')
+        self.f_name_label.grid(row=1, column=1, padx=padX_size, pady=borders_widgets, sticky=sticky_label)
 
-        self.f_name_entry = customtkinter.CTkEntry(
-            self.patient_tab,
+        self.f_name_entry = ctk.CTkEntry(
+            self.new_form_frame,
             font=hebrew_font,
             width=250,
             justify='right'
         )
-        self.f_name_entry.grid(row=1, column=0, padx=10, pady=5, sticky='e')
+        self.f_name_entry.grid(row=1, column=0, padx=padX_size, pady=borders_widgets, sticky=sticky_entry)
 
         # Last Name
-        self.l_name_label = customtkinter.CTkLabel(
-            self.patient_tab,
+        self.l_name_label = ctk.CTkLabel(
+            self.new_form_frame,
             text="שם משפחה",
             font=hebrew_font,
             anchor="e"
         )
-        self.l_name_label.grid(row=2, column=1, padx=10, pady=5, sticky='w')
-        self.l_name_entry = customtkinter.CTkEntry(
-            self.patient_tab,
+        self.l_name_label.grid(row=2, column=1, padx=padX_size, pady=padY_size, sticky=sticky_label)
+
+        self.l_name_entry = ctk.CTkEntry(
+            self.new_form_frame,
             font=hebrew_font,
             width=250,
             justify='right'
-
         )
-        self.l_name_entry.grid(row=2, column=0, padx=10, pady=5, sticky='e')  # align the entry to the right
+        self.l_name_entry.grid(row=2, column=0, padx=padX_size, pady=padY_size,
+                               sticky=sticky_entry)  # align the entry to the right
 
-        # id input
-
-        self.id_label = customtkinter.CTkLabel(
-            self.patient_tab,
+        # ID input
+        self.id_label = ctk.CTkLabel(
+            self.new_form_frame,
             text="תעודת זהות",
             font=hebrew_font,
-            anchor="w"
+            anchor=sticky_label
         )
-        self.id_label.grid(row=3, column=1, padx=padX_size, pady=5, sticky='w')
-        self.id_entry = customtkinter.CTkEntry(
-            self.patient_tab,
+        self.id_label.grid(row=3, column=1, padx=padX_size, pady=padY_size, sticky=sticky_label)
+
+        self.id_entry = ctk.CTkEntry(
+            self.new_form_frame,
             font=hebrew_font,
             width=250,
             justify='right'
         )
-        self.id_entry.grid(row=3, column=0, padx=10, pady=5, sticky='e')
+        self.id_entry.grid(row=3, column=0, padx=padX_size, pady=padY_size, sticky=sticky_entry)
 
-        # phone
-        self.phone_label = customtkinter.CTkLabel(
-            self.patient_tab,
+        # Phone input
+        self.phone_label = ctk.CTkLabel(
+            self.new_form_frame,
             text="טלפון",
             font=hebrew_font,
             anchor="e"
         )
-        self.phone_label.grid(row=4, column=1, padx=10, pady=5, sticky='w')
-        self.phone_entry = customtkinter.CTkEntry(
-            self.patient_tab,
+        self.phone_label.grid(row=4, column=1, padx=padX_size, pady=padY_size, sticky=sticky_label)
+
+        self.phone_entry = ctk.CTkEntry(
+            self.new_form_frame,
             font=hebrew_font,
             width=250,
             justify='right'
-
         )
-        self.phone_entry.grid(row=4, column=0, padx=10, pady=5, sticky='e')  # align the entry to the right
+        self.phone_entry.grid(row=4, column=0, padx=padX_size, pady=padY_size,
+                              sticky=sticky_entry)  # align the entry to the right
 
         # Age Input
-        self.birth_date_label = customtkinter.CTkLabel(
-            self.patient_tab,
+        self.birth_date_label = ctk.CTkLabel(
+            self.new_form_frame,
             text="תאריך לידה",
             font=hebrew_font,
             anchor="e"
         )
-        self.birth_date_label.grid(row=5, column=1, padx=10, pady=5, sticky='w')
+        self.birth_date_label.grid(row=5, column=1, padx=padX_size, pady=padY_size, sticky=sticky_label)
+
         # Add a DateEntry widget (calendar)
-        self.calendar = DateEntry(self.patient_tab, date_pattern='dd/mm/yyyy',
-                                  width=12,
-                                  background="darkblue",
-                                  foreground="white")
-        self.calendar.grid(row=5, column=0, padx=10, pady=10, sticky="e")
-
+        self.calendar = DateEntry(
+            self.new_form_frame,
+            date_pattern='dd/mm/yyyy',
+            width=24,  # Increase the width to make it bigger
+            background="darkblue",
+            foreground="white",
+            font=("Arial", 16)  # Adjust the font size to make the text inside the widget bigger
+        )
+        self.calendar.grid(row=5, column=0, padx=padX_size, pady=padY_size, sticky=sticky_entry)
         # Submit Button
-        self.create_button = customtkinter.CTkButton(self.patient_tab, text=" WORD צור קובץ ", width=250,
-                                                     command=self.collect_data,
+        self.create_button = ctk.CTkButton(self.new_form_frame,
+                                           text="WORD קובץ צור  ",
+                                           width=250,
+                                           height=100,
+                                           command=self.collect_data)
+        self.create_button.grid(row=6, column=0, padx=padX_size, pady=(0, 30), sticky=sticky_entry)
 
-                                                     )
-        self.create_button.grid(row=6, column=0, padx=padX_size, pady=5, sticky='e')
+        ###################################################################################################
 
-    def create_search_tab(self):
-        hebrew_font = ("Arial", 14)
-
+        self.search_patients_frame = ctk.CTkFrame(self.main_frame, fg_color=color1)  # Use ctk.CTkFrame directly
         # Configure column weights to make the layout responsive
-        self.search_tab.columnconfigure(0, weight=1)  # Search button
-        self.search_tab.columnconfigure(1, weight=1)  # Search entry
-        self.search_tab.columnconfigure(2, weight=3)  # Label
-        self.search_tab.rowconfigure(1, weight=1)  # Make treeFrame's row expandable
-
-        self.search_label = customtkinter.CTkLabel(
-            self.search_tab,
+        self.search_patients_frame.columnconfigure(0, weight=1)  # Search button
+        self.search_patients_frame.columnconfigure(1, weight=1)  # Search entry
+        self.search_patients_frame.columnconfigure(2, weight=3)  # Label
+        self.search_patients_frame.rowconfigure(1, weight=1)  # Make treeFrame's row expandable
+        self.search_label = ctk.CTkLabel(
+            self.search_patients_frame,
             text="חיפוש מטופל",
             font=hebrew_font,
             anchor="center"
         )
         self.search_label.grid(row=0, column=3, padx=10, pady=5, sticky='we')
 
-        self.search_entry = customtkinter.CTkEntry(
-            self.search_tab,
+        self.search_entry = ctk.CTkEntry(
+            self.search_patients_frame,
             font=hebrew_font,
 
             justify='right'
@@ -340,48 +337,150 @@ class PatientForm:
         self.search_entry.bind("<Return>", self.search_data)
 
         # Search Button
-        self.search_button = customtkinter.CTkButton(self.search_tab,
-                                                     text="חיפוש",
-                                                     width=100,
-                                                     command=self.search_data)
+        self.search_button = ctk.CTkButton(self.search_patients_frame,
+                                           text="חיפוש",
+                                           width=100,
+                                           command=self.search_data)
         self.search_button.grid(row=0, column=1, sticky='we', padx=10, pady=10)
 
-        self.delete_button = customtkinter.CTkButton(self.search_tab,
-                                                     text="איפוס",
-                                                     width=100,
-                                                     fg_color="red",
-                                                     hover_color="#AF1740",
-                                                     command=self.delete_search_data)
+        self.delete_button = ctk.CTkButton(self.search_patients_frame,
+                                           text="איפוס",
+                                           width=100,
+                                           fg_color="red",
+                                           hover_color="#AF1740",
+                                           command=self.delete_search_data)
+        self.delete_button.grid(row=0, column=0, sticky='we', padx=10, pady=10)
+        self.patientsTreeFrame = ttk.Frame(self.search_patients_frame)
+        self.patientsTreeFrame.grid(row=1, column=0, padx=10, pady=10, columnspan=4, sticky='nswe')
+
+        self.treeScroll = ttk.Scrollbar(self.patientsTreeFrame)
+        self.treeScroll.pack(side="right", fill="y")
+        self.treeViewStyle = ttk.Style()
+        self.treeViewStyle.configure("Custom.Treeview",
+                                     font=("Arial ", 12))
+        # Configure the style for the headings with a larger font
+        self.treeViewStyle.configure("Custom.Treeview.Heading",
+                                     font=("Arial", 14, "bold"))  # Font for headings
+
+        cols = ("טלפון", "גיל", "שם פרטי", "שם משפחה", "תעודה מזהה")
+        self.patients_treeview = ttk.Treeview(self.patientsTreeFrame,
+                                              show="headings",
+                                              yscrollcommand=self.treeScroll.set,
+                                              columns=cols,
+                                              height=13,
+                                              style="Custom.Treeview")
+
+        # Configure each column
+        for col in cols:
+            # Set column heading with center alignment
+            self.patients_treeview.heading(col, text=col, anchor="center")
+            # Set column width and data alignment
+            self.patients_treeview.column(col, width=100, anchor="center")
+
+        self.treeScroll.config(command=self.patients_treeview.yview)
+        self.patients_treeview.pack(fill="both", expand=True)
+
+        ###################################################################################################
+        self.search_visits_frame = ctk.CTkFrame(self.main_frame, fg_color=color1)  # Use ctk.CTkFrame directly
+
+        # Configure column weights to make the layout responsive
+        self.search_visits_frame.columnconfigure(0, weight=1)  # Search button
+        self.search_visits_frame.columnconfigure(1, weight=1)  # Search entry
+        self.search_visits_frame.columnconfigure(2, weight=3)  # Label
+        self.search_visits_frame.rowconfigure(1, weight=1)  # Make treeFrame's row expandable
+
+        self.search_label = ctk.CTkLabel(
+            self.search_visits_frame,
+            text="חיפוש ביקור",
+            font=hebrew_font,
+            anchor="center"
+        )
+        self.search_label.grid(row=0, column=3, padx=10, pady=5, sticky='we')
+
+        self.search_entry = ctk.CTkEntry(
+            self.search_visits_frame,
+            font=hebrew_font,
+
+            justify='right'
+        )
+        self.search_entry.grid(row=0, column=2, padx=10, pady=10, sticky='we')
+        self.search_entry.bind("<Return>", self.search_data)
+
+        # Search Button
+        self.search_button = ctk.CTkButton(self.search_visits_frame,
+                                           text="חיפוש",
+                                           width=100,
+                                           command=self.search_data)
+        self.search_button.grid(row=0, column=1, sticky='we', padx=10, pady=10)
+
+        self.delete_button = ctk.CTkButton(self.search_visits_frame,
+                                           text="איפוס",
+                                           width=100,
+                                           fg_color="red",
+                                           hover_color="#AF1740",
+                                           command=self.delete_search_data)
         self.delete_button.grid(row=0, column=0, sticky='we', padx=10, pady=10)
 
-        self.treeFrame = ttk.Frame(self.search_tab)
+        self.treeFrame = ttk.Frame(self.search_visits_frame)
         self.treeFrame.grid(row=1, column=0, padx=10, pady=10, columnspan=4, sticky='nswe')
 
         self.treeScroll = ttk.Scrollbar(self.treeFrame)
         self.treeScroll.pack(side="right", fill="y")
+        self.treeViewStyle = ttk.Style()
+        self.treeViewStyle.configure("Custom.Treeview",
+                                     font=("Arial ", 12))
+        # Configure the style for the headings with a larger font
+        self.treeViewStyle.configure("Custom.Treeview.Heading",
+                                     font=("Arial", 14, "bold"))  # Font for headings
 
         cols = ("תאריך ביקור", "טלפון", "גיל", "שם פרטי", "שם משפחה", "תעודה מזהה")
-        self.treeview = ttk.Treeview(self.treeFrame, show="headings",
-                                     yscrollcommand=self.treeScroll.set, columns=cols, height=13)
+        self.visit_treeview = ttk.Treeview(self.treeFrame,
+                                           show="headings",
+                                           yscrollcommand=self.treeScroll.set,
+                                           columns=cols,
+                                           height=13,
+                                           style="Custom.Treeview")
+
         # Configure each column
         for col in cols:
             # Set column heading with center alignment
-            self.treeview.heading(col, text=col, anchor="center")
+            self.visit_treeview.heading(col, text=col, anchor="center")
 
             # Set column width and data alignment
-            self.treeview.column(col, width=100, anchor="center")
+            self.visit_treeview.column(col, width=100, anchor="center")
         # Bind the left-click event to the open_docx function
-        self.treeview.bind("<Double-1>", open_word_document)
+        self.visit_treeview.bind("<Double-1>", open_word_document)
         # Bind the Enter key press event to the open_docx function
-        self.treeview.bind("<Return>", open_word_document)
-        self.treeScroll.config(command=self.treeview.yview)
-        self.treeview.pack(fill="both", expand=True)
+        self.visit_treeview.bind("<Return>", open_word_document)
+        self.treeScroll.config(command=self.visit_treeview.yview)
+        self.visit_treeview.pack(fill="both", expand=True)
 
-        load_data(self)
+        load_visit_data(self)
+        load_patient_data(self)
+        self.show_new_form()
 
-    def delete_search_data(self):
-        self.search_entry.delete(0, tk.END)
-        self.search_data()
+    def show_new_form(self):
+
+        self.current_frame.pack_forget()
+        self.parent_new_form_frame.pack(expand=True, fill="both", padx=20, pady=20)  # Make it responsive
+        self.new_form_frame.pack(expand=True, padx=50, pady=50)
+        self.current_frame = self.new_form_frame
+
+    def show_visits_search_frame(self):
+
+        self.search_visits_frame.pack(fill="both", expand=True)
+        if self.current_frame != self.search_visits_frame:
+            self.current_frame.pack_forget()
+            self.parent_new_form_frame.pack_forget()
+            self.current_frame = self.search_visits_frame
+
+    def show_patients_search_frame(self):
+
+        self.search_patients_frame.pack(fill="both", expand=True)
+        if self.current_frame != self.search_patients_frame:
+            self.current_frame.pack_forget()
+            self.parent_new_form_frame.pack_forget()
+            self.current_frame = self.search_patients_frame
 
     def calculate_age(self, birthdate_str):
 
@@ -402,6 +501,28 @@ class PatientForm:
 
         return age
 
+    def delete_search_data(self):
+        self.search_entry.delete(0, tk.END)
+        self.search_data()
+
+    def search_data(self, event=None):
+        search_term = self.search_entry.get()
+
+        # Clear existing items in visit_treeview
+        for item in self.visit_treeview.get_children():
+            self.visit_treeview.delete(item)
+
+        # Get search results from database
+        results = db.search_patients(search_term)
+
+        # Reinsert matching items with calculated ages
+        for row in results:
+            row_with_age = list(row)  # Convert the tuple to a list
+            birthdate_str = row[2]  # Assuming birthdate is the 3rd column
+            row_with_age[2] = self.calculate_age(birthdate_str)  # Replace birthdate with calculated age
+
+            self.visit_treeview.insert('', 'end', values=row_with_age)
+
     def collect_data(self):
         first_name = self.f_name_entry.get()
         last_name = self.l_name_entry.get()
@@ -409,7 +530,7 @@ class PatientForm:
         birth_date = self.calendar.get()
         phone = self.phone_entry.get()
         check_birth_date = birth_date
-
+        print(birth_date)
         if not first_name or not last_name or not birth_date or not ID or not phone:
             messagebox.showwarning("שגיאת קלט", " ! אנא מלא את כל השדות")
             return
@@ -432,26 +553,26 @@ class PatientForm:
         # Get the current date in the desired format (e.g., dd-mm-yyyy)
         current_date = datetime.now().strftime('%d-%m-%Y')  # Use hyphens instead of slashes
         age = self.calculate_age(birth_date)
-
         if db.check_patient_id_exists(ID):
             messagebox.showwarning("שגיאת קלט", "המטופל כבר קיים במערכת")
         else:
             docx = create_docx(first_name, last_name, ID, age, current_date, phone)
             db.insert_patient_record(first_name, last_name, ID, birth_date, phone)
             db.insert_visit_record(ID, current_date, docx)
+
         # Clear all entry widgets
         self.f_name_entry.delete(0, tk.END)
         self.l_name_entry.delete(0, tk.END)
         self.id_entry.delete(0, tk.END)
         self.phone_entry.delete(0, tk.END)
-        load_data(self)
+        load_visit_data(self)
+        load_patient_data(self)
 
 
 def main():
     # Call the function to create the tables
     db.create_tables()
-    root = tk.Tk()
-    root.option_add('*Font', 'Arial 14')
+    root = ctk.CTk(fg_color=color1)  # create CTk window like you do with the Tk window
     PatientForm(root)
     root.mainloop()
 
