@@ -21,6 +21,47 @@ borders_widgets = (30, 20)
 color1 = "#176B87"
 color2 = "#64CCC5"
 
+image = Image.open("images/icons8-restart-50.png")
+rest_icon = ctk.CTkImage(dark_image=image, size=(20, 20))  # Adjust size as needed
+
+
+def sort_treeview_column(treeview, column, reverse):
+    """
+    Sort the Treeview by the specified column.
+
+    :param treeview: The Treeview widget.
+    :param column: The column to sort by.
+    :param reverse: Boolean value to indicate whether to reverse the order.
+    """
+    # Get the data from the treeview and sort it by the column
+    data = [(treeview.set(child, column), child) for child in treeview.get_children('')]
+    data.sort(key=lambda x: x[0], reverse=reverse)
+
+    # Re-insert the sorted data back into the treeview
+    for index, item in enumerate(data):
+        treeview.move(item[1], '', index)
+
+    # Toggle the reverse order for the next sort
+    return not reverse
+
+
+def on_column_click(treeview, column, sort_directions):
+    """
+    Handle a column click for sorting.
+
+    :param treeview: The Treeview widget.
+    :param column: The column that was clicked.
+    :param sort_directions: A dictionary storing the sort direction for each column.
+    """
+    # Get the current sorting direction for the clicked column
+    reverse = sort_directions.get(column, False)  # Default to False (ascending) if not set
+
+    # Toggle the sorting order (ascending <-> descending)
+    sort_directions[column] = not reverse  # Toggle the value for the column
+
+    # Sort the treeview based on the column and direction
+    sort_treeview_column(treeview, column, reverse)
+
 
 def resource_path(relative_path):
     """Get the absolute path to a resource, compatible with PyInstaller."""
@@ -226,7 +267,7 @@ class PatientForm:
         # Load an image using Pillow
         image = Image.open("logo/SmartDocLogo.png")
         ctk_image = CTkImage(light_image=image, size=(200, 100))
-
+        self.error_is_raised = True
         self.logo_label = ctk.CTkLabel(
             self.options_frame,
             image=ctk_image,
@@ -234,25 +275,24 @@ class PatientForm:
         )
         self.logo_label.pack(pady=(0, 150))
         # Adding buttons to options_frame
-        self.button1 = ctk.CTkButton(self.options_frame,
-                                     text="חדש מטופל",
-                                     width=200,
-                                     height=40,
-                                     command=self.show_new_form)
-        self.button1.pack(pady=10)
-        self.button2 = ctk.CTkButton(self.options_frame,
-                                     text="ביקור חיפוש",
-                                     width=200,
-                                     height=40,
-                                     command=self.show_visits_search_frame)
-        self.button2.pack(pady=10)
-
-        self.button3 = ctk.CTkButton(self.options_frame,
-                                     text="מטופל חיפוש",
-                                     width=200,
-                                     height=40,
-                                     command=self.show_patients_search_frame)
-        self.button3.pack(pady=10)
+        self.new_form_button = ctk.CTkButton(self.options_frame,
+                                             text="חדש מטופל",
+                                             width=200,
+                                             height=40,
+                                             command=self.show_new_form)
+        self.new_form_button.pack(pady=10)
+        self.search_visit_button = ctk.CTkButton(self.options_frame,
+                                                 text="ביקור חיפוש",
+                                                 width=200,
+                                                 height=40,
+                                                 command=self.show_visits_search_frame)
+        self.search_visit_button.pack(pady=10)
+        self.search_patients_button = ctk.CTkButton(self.options_frame,
+                                                    text="מטופל חיפוש",
+                                                    width=200,
+                                                    height=40,
+                                                    command=self.show_patients_search_frame)
+        self.search_patients_button.pack(pady=10)
 
         self.parent_new_form_frame = ctk.CTkFrame(self.main_frame,
                                                   fg_color=color1)  # Add a parent frame inside the main window
@@ -412,10 +452,9 @@ class PatientForm:
         self.search_button.grid(row=0, column=1, sticky='we', padx=10, pady=10)
 
         self.delete_button = ctk.CTkButton(self.search_patients_frame,
-                                           text="איפוס",
-                                           width=100,
-                                           fg_color="red",
-                                           hover_color="#AF1740",
+                                           image=rest_icon,
+                                           text="",
+                                           width=50,
                                            command=self.delete_search_data)
         self.delete_button.grid(row=0, column=0, sticky='we', padx=10, pady=10)
         self.patientsTreeFrame = ttk.Frame(self.search_patients_frame)
@@ -441,7 +480,8 @@ class PatientForm:
         # Configure each column
         for col in cols:
             # Set column heading with center alignment
-            self.patients_treeview.heading(col, text=col, anchor="center")
+            self.patients_treeview.heading(col, text=col,
+                                           command=lambda c=col: on_column_click(self.patients_treeview, c, False))
             # Set column width and data alignment
             self.patients_treeview.column(col, width=100, anchor="center")
 
@@ -486,10 +526,9 @@ class PatientForm:
         self.search_button.grid(row=0, column=1, sticky='we', padx=10, pady=10)
 
         self.delete_button = ctk.CTkButton(self.search_visits_frame,
-                                           text="איפוס",
-                                           width=100,
-                                           fg_color="red",
-                                           hover_color="#AF1740",
+                                           image=rest_icon,
+                                           text="",
+                                           width=50,
                                            command=self.delete_search_data)
         self.delete_button.grid(row=0, column=0, sticky='we', padx=10, pady=10)
 
@@ -504,7 +543,8 @@ class PatientForm:
         # Configure the style for the headings with a larger font
         self.treeViewStyle.configure("Custom.Treeview.Heading",
                                      font=("Arial", 14, "bold"))  # Font for headings
-
+        # Define columns and their headings
+        sort_directions = {}  # Dictionary to track sort direction for each column
         cols = ("תאריך ביקור", "טלפון", "גיל", "שם פרטי", "שם משפחה", "תעודה מזהה")
         self.visit_treeview = ttk.Treeview(self.treeFrame,
                                            show="headings",
@@ -516,7 +556,8 @@ class PatientForm:
         # Configure each column
         for col in cols:
             # Set column heading with center alignment
-            self.visit_treeview.heading(col, text=col, anchor="center")
+            self.visit_treeview.heading(col, text=col,
+                                        command=lambda c=col: on_column_click(self.visit_treeview, c, sort_directions))
 
             # Set column width and data alignment
             self.visit_treeview.column(col, width=100, anchor="center")
@@ -533,6 +574,9 @@ class PatientForm:
 
     def show_new_form(self):
 
+        self.new_form_button.configure(fg_color="#DD5746", hover_color="#C7253E")
+        self.search_visit_button.configure(fg_color="#3572EF")
+        self.search_patients_button.configure(fg_color="#3572EF")
         self.current_frame.pack_forget()
         self.parent_new_form_frame.pack(expand=True, fill="both", padx=20, pady=20)  # Make it responsive
         self.new_form_frame.pack(expand=True, padx=50, pady=50)
@@ -542,6 +586,9 @@ class PatientForm:
 
         self.search_visits_frame.pack(fill="both", expand=True)
         if self.current_frame != self.search_visits_frame:
+            self.search_visit_button.configure(fg_color="#DD5746", hover_color="#C7253E")
+            self.new_form_button.configure(fg_color="#3572EF")
+            self.search_patients_button.configure(fg_color="#3572EF")
             self.current_frame.pack_forget()
             self.parent_new_form_frame.pack_forget()
             self.current_frame = self.search_visits_frame
@@ -550,6 +597,9 @@ class PatientForm:
 
         self.search_patients_frame.pack(fill="both", expand=True)
         if self.current_frame != self.search_patients_frame:
+            self.search_patients_button.configure(fg_color="#DD5746", hover_color="#C7253E")
+            self.search_visit_button.configure(fg_color="#3572EF")
+            self.new_form_button.configure(fg_color="#3572EF")
             self.current_frame.pack_forget()
             self.parent_new_form_frame.pack_forget()
             self.current_frame = self.search_patients_frame
@@ -577,6 +627,8 @@ class PatientForm:
             self.visit_treeview.insert('', 'end', values=row_with_age)
 
     def collect_data(self):
+
+        self.error_is_raised = True
         first_name = self.f_name_entry.get()
         last_name = self.l_name_entry.get()
         ID = self.id_entry.get()
@@ -610,15 +662,25 @@ class PatientForm:
         if db.check_patient_id_exists(ID):
             messagebox.showwarning("שגיאת קלט", "המטופל כבר קיים במערכת")
         else:
-            docx = create_docx(first_name, last_name, ID, age, phone)
-            db.insert_patient_record(first_name, last_name, ID, birth_date, phone)
-            db.insert_visit_record(ID, current_date, docx)
+            try:
+                db.insert_patient_record(first_name, last_name, ID, birth_date, phone)
+                docx = create_docx(first_name, last_name, ID, age, phone)
+                db.insert_visit_record(ID, current_date, docx)
+            except ValueError as e:
+                # Catch the validation error raised by insert_patient_record and show the error message
+                messagebox.showerror("Error", str(e))
+                self.error_is_raised = False
+            except Exception as e:
+                # Catch any other errors and show a generic error message
+                messagebox.showerror("Error", f"An unexpected error occurred: {str(e)}")
 
-        # Clear all entry widgets
-        self.f_name_entry.delete(0, tk.END)
-        self.l_name_entry.delete(0, tk.END)
-        self.id_entry.delete(0, tk.END)
-        self.phone_entry.delete(0, tk.END)
+        if self.error_is_raised:
+            # Clear all entry widgets
+            self.f_name_entry.delete(0, tk.END)
+            self.l_name_entry.delete(0, tk.END)
+            self.id_entry.delete(0, tk.END)
+            self.phone_entry.delete(0, tk.END)
+
         load_visit_data(self)
         load_patient_data(self)
 

@@ -1,6 +1,18 @@
 import sqlite3
 
 
+# Validate the ID
+def validate_input(patient_id, phone):
+    # Check if ID is a 9-digit integer
+    if len(patient_id) != 9 or not patient_id.isdigit():
+        raise ValueError("תעודת זהות אמורה להכיל 9 מספרים")
+
+    if len(phone) != 10 or not phone.isdigit():
+        raise ValueError("מספר טלפון אמור להכיל 10 מספרים")
+
+    return True
+
+
 def create_tables():
     # Connect to SQLite database (or create it if it doesn't exist)
     conn = sqlite3.connect("patients.db")
@@ -15,7 +27,7 @@ def create_tables():
         # If the table doesn't exist, create it
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS patients (
-            patient_id INTEGER PRIMARY KEY,
+            patient_id INTEGER (9) PRIMARY KEY,
             first_name VARCHAR  (50) NOT NULL,
             last_name VARCHAR (50) NOT NULL,
             birthdate VARCHAR (11) NOT NULL,
@@ -99,27 +111,20 @@ def insert_visit_record(ID, current_date, docx_path):
         # Ensure the connection is closed
         conn.close()
 
-def insert_patient_record(first_name, last_name, patient_id, birthdate, phone):
-    """
-    Inserts a new patient record into the SQLite database.
 
-    Parameters:
-        first_name (str): The patient's first name.
-        last_name (str): The patient's last name.
-        patient_id (str): The patient's unique ID.
-        birthdate (str): The patient's age (as a string).
-        time (str): The time of the record (e.g., a timestamp or date).
-        docx_path (str): The path to the patient's document file.
-        :param phone:
-    """
+def insert_patient_record(first_name, last_name, patient_id, birthdate, phone):
+    """ Inserts a new patient record into the SQLite database. """
+    # Validate the patient ID
+    validate_input(patient_id, phone)  # This will raise an error if the ID is invalid
+
     # Connect to the SQLite database
     conn = sqlite3.connect("patients.db")
     cursor = conn.cursor()
 
     # Insert the patient record into the patients table
     cursor.execute("""
-    INSERT INTO patients (patient_id, first_name, last_name, birthdate,phone_number)
-    VALUES (?, ?, ?, ?,?)
+    INSERT INTO patients (patient_id, first_name, last_name, birthdate, phone_number)
+    VALUES (?, ?, ?, ?, ?)
     """, (patient_id, first_name, last_name, birthdate, phone))
 
     # Commit the changes and close the connection
