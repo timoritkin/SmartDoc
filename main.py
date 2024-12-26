@@ -4,6 +4,7 @@ import sys
 import time
 import tkinter as tk
 from datetime import datetime
+from pathlib import Path
 from tkinter import messagebox, ttk
 from docxtpl import DocxTemplate
 import db_setup as db
@@ -21,6 +22,47 @@ borders_widgets = (30, 20)
 color1 = "#176B87"
 color2 = "#64CCC5"
 
+image = Image.open("images/icons8-restart-50.png")
+rest_icon = ctk.CTkImage(dark_image=image, size=(20, 20))  # Adjust size as needed
+
+
+def sort_treeview_column(treeview, column, reverse):
+    """
+    Sort the Treeview by the specified column.
+
+    :param treeview: The Treeview widget.
+    :param column: The column to sort by.
+    :param reverse: Boolean value to indicate whether to reverse the order.
+    """
+    # Get the data from the treeview and sort it by the column
+    data = [(treeview.set(child, column), child) for child in treeview.get_children('')]
+    data.sort(key=lambda x: x[0], reverse=reverse)
+
+    # Re-insert the sorted data back into the treeview
+    for index, item in enumerate(data):
+        treeview.move(item[1], '', index)
+
+    # Toggle the reverse order for the next sort
+    return not reverse
+
+
+def on_column_click(treeview, column, sort_directions):
+    """
+    Handle a column click for sorting.
+
+    :param treeview: The Treeview widget.
+    :param column: The column that was clicked.
+    :param sort_directions: A dictionary storing the sort direction for each column.
+    """
+    # Get the current sorting direction for the clicked column
+    reverse = sort_directions.get(column, False)  # Default to False (ascending) if not set
+
+    # Toggle the sorting order (ascending <-> descending)
+    sort_directions[column] = not reverse  # Toggle the value for the column
+
+    # Sort the treeview based on the column and direction
+    sort_treeview_column(treeview, column, reverse)
+
 
 def resource_path(relative_path):
     """Get the absolute path to a resource, compatible with PyInstaller."""
@@ -33,24 +75,20 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
+# Get the selected item
 def open_word_document(event):
     # Get the selected item
     selected_item = event.widget.selection()
     if not selected_item:
         return
-
-    # Retrieve file information
     p_id = event.widget.item(selected_item, 'values')[5]
+    # Retrieve file information
     visit_date = event.widget.item(selected_item, 'values')[0]
-
-    # Get the document path from the database (adjust `db.get_docx_path` if necessary)
     path = db.get_docx_path(p_id, visit_date)
-
-    # Resolve the full path for bundled environments
+    # Get the document path from the database (adjust `db.get_docx_path` if necessary)
     if path:
         path = resource_path(path)
-
-    # Check if the file exists before attempting to open it
+    # Resolve the full path for bundled environments
     if path and os.path.exists(path):
         try:
             # Use the default application to open the file
@@ -66,34 +104,14 @@ def open_word_document(event):
         messagebox.showwarning("Warning", "הקובץ לא נמצא")
 
 
-def create_docx(f_name, l_name, id_num, age, date, phone):
-    # Load the template using resource_path
-    template_path = resource_path('template/Clalit mushlam template.docx')
-    doc = DocxTemplate(template_path)
 
-    # Define the folder name for saving documents
-    folder_name = 'patients docx'
+def create_directory(path):
+    """Ensure a directory exists."""
+    path.mkdir(parents=True, exist_ok=True)
 
-    # Get the current script's directory (adjust for PyInstaller's bundle)
-    script_dir = os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(__file__))
-    folder_path = os.path.join(script_dir, folder_name)
 
-    # Ensure the folder exists, create it if it doesn't
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
-
-    # Prepare context for the document
-    context = {'f_name': f_name, 'l_name': l_name, 'id': id_num, 'age': age, 'phone': phone}
-
-    # Render the document with the provided data
-    doc.render(context)
-
-    # Save the document with a new name
-    file_name = f'{f_name}_{l_name}_{id_num}_{date}_doc.docx'
-    file_path = os.path.join(folder_path, file_name)
-    doc.save(file_path)
-
-    # Open the document automatically
+def open_file(file_path):
+    """Open a file based on the operating system."""
     if sys.platform == "win32":  # For Windows
         os.startfile(file_path)
     elif sys.platform == "darwin":  # For macOS
@@ -101,7 +119,88 @@ def create_docx(f_name, l_name, id_num, age, date, phone):
     else:  # For Linux
         subprocess.run(["xdg-open", file_path])
 
-    return file_path
+
+def create_docx(f_name, l_name, id_num, age, phone):
+    # Load the template using resource_path
+    template_path = resource_path('template/Clalit mushlam template.docx')
+    doc = DocxTemplate(template_path)
+
+    # Get the current date in the desired format
+    date = datetime.now().strftime('%d-%m-%Y')  # Use hyphens instead of slashes
+
+    # Define base and patient-specific folders
+    script_dir = Path(sys._MEIPASS if getattr(sys, 'frozen', False) else __file__).parent
+    base_folder = script_dir / 'My patients'
+    patient_folder = base_folder / f"{f_name}_{l_name}_{id_num}"
+
+    # Ensure folders exist
+    create_directory(base_folder)
+    create_directory(patient_folder)
+
+    # Prepare context for the document
+    context = {'f_name': f_name, 'l_name': l_name, 'id': id_num, 'age': age, 'phone': phone}
+
+    # Render and save the document
+    file_name = f"{f_name}_{l_name}_{id_num}_{date}.docx"
+    file_path = patient_folder / file_name
+    doc.render(context)
+    doc.save(file_path)
+
+    # Open the document automatically
+    open_file(file_path)
+    # Convert file_path to a string before passing to insert
+    docx_path_str = str(file_path)
+
+    return docx_path_str
+
+
+
+
+# user will be asked if they want to create new visit as a result new doc will be created
+def create_new_visit(event, tree):
+    # Get the selected row (item) that was double-clicked
+    selected_item = tree.selection()
+
+    if selected_item:  # If an item is selected
+        # Get the data (values) of the selected row
+        item_data = tree.item(selected_item[0])["values"]
+        # Get the current date in the desired format (e.g., dd-mm-yyyy)
+        current_date = datetime.now().strftime('%d-%m-%Y')  # Use hyphens instead of slashes
+
+        # Create a new window (pop-up)
+        popup = tk.Toplevel()
+        popup.title("Pop-up Window")
+        # Prevent the window from being resized
+        popup.resizable(False, False)
+        popup_frame = ctk.CTkFrame(popup, fg_color=color1)  # Use ctk.CTkFrame directly
+        print(item_data[4])
+        # Last Name
+        question_label = ctk.CTkLabel(
+            popup_frame,
+            text=f"? האם ליצור עבור המטופל {item_data[2]} {item_data[3]} ביקור חדש ",
+            font=hebrew_font,
+            anchor="e"
+        )
+        question_label.grid(row=0, column=0, columnspan=2, padx=padX_size, pady=padY_size, sticky='nswe')
+
+        confirm_button = ctk.CTkButton(popup_frame,
+                                       text="אישור",
+                                       width=100,
+                                       command=lambda: ((docx_path := create_docx(item_data[2], item_data[3],
+                                                                                  item_data[4], item_data[1],
+                                                                                  item_data[0])),
+                                                        db.insert_visit_record(item_data[4], current_date, docx_path)))
+
+        confirm_button.grid(row=1, column=1, sticky='we', padx=10, pady=10)
+
+        denied_button = ctk.CTkButton(popup_frame,
+                                      text="ביטול",
+                                      width=100,
+                                      fg_color="red",
+                                      hover_color="#AF1740",
+                                      command=popup.destroy)
+        denied_button.grid(row=1, column=0, sticky='we', padx=10, pady=10)
+        popup_frame.grid(row=0, column=0, sticky="nsew")
 
 
 def load_visit_data(self):
@@ -136,6 +235,25 @@ def load_patient_data(self):
         self.patients_treeview.insert("", tk.END, values=row_with_replaced_age)
 
 
+def calculate_age(birthdate_str):
+    try:
+        # Parse the birthdate string
+        birthdate = datetime.strptime(birthdate_str, '%d/%m/%Y')
+    except ValueError:
+        return None
+
+    # Calculate the current age
+    current_date = datetime.today()
+    age = current_date.year - birthdate.year
+
+    # Adjust for birthday not yet occurring this year
+    if current_date.month < birthdate.month or (
+            current_date.month == birthdate.month and current_date.day < birthdate.day):
+        age -= 1
+
+    return age
+
+
 class PatientForm:
 
     def __init__(self, root):
@@ -158,7 +276,7 @@ class PatientForm:
         # Load an image using Pillow
         image = Image.open("logo/SmartDocLogo.png")
         ctk_image = CTkImage(light_image=image, size=(200, 100))
-
+        self.error_is_raised = True
         self.logo_label = ctk.CTkLabel(
             self.options_frame,
             image=ctk_image,
@@ -166,25 +284,24 @@ class PatientForm:
         )
         self.logo_label.pack(pady=(0, 150))
         # Adding buttons to options_frame
-        self.button1 = ctk.CTkButton(self.options_frame,
-                                     text="חדש מטופל",
-                                     width=200,
-                                     height=40,
-                                     command=self.show_new_form)
-        self.button1.pack(pady=10)
-        self.button2 = ctk.CTkButton(self.options_frame,
-                                     text="ביקור חיפוש",
-                                     width=200,
-                                     height=40,
-                                     command=self.show_visits_search_frame)
-        self.button2.pack(pady=10)
-
-        self.button3 = ctk.CTkButton(self.options_frame,
-                                     text="מטופל חיפוש",
-                                     width=200,
-                                     height=40,
-                                     command=self.show_patients_search_frame)
-        self.button3.pack(pady=10)
+        self.new_form_button = ctk.CTkButton(self.options_frame,
+                                             text="חדש מטופל",
+                                             width=200,
+                                             height=40,
+                                             command=self.show_new_form)
+        self.new_form_button.pack(pady=10)
+        self.search_visit_button = ctk.CTkButton(self.options_frame,
+                                                 text="ביקור חיפוש",
+                                                 width=200,
+                                                 height=40,
+                                                 command=self.show_visits_search_frame)
+        self.search_visit_button.pack(pady=10)
+        self.search_patients_button = ctk.CTkButton(self.options_frame,
+                                                    text="מטופל חיפוש",
+                                                    width=200,
+                                                    height=40,
+                                                    command=self.show_patients_search_frame)
+        self.search_patients_button.pack(pady=10)
 
         self.parent_new_form_frame = ctk.CTkFrame(self.main_frame,
                                                   fg_color=color1)  # Add a parent frame inside the main window
@@ -344,10 +461,9 @@ class PatientForm:
         self.search_button.grid(row=0, column=1, sticky='we', padx=10, pady=10)
 
         self.delete_button = ctk.CTkButton(self.search_patients_frame,
-                                           text="איפוס",
-                                           width=100,
-                                           fg_color="red",
-                                           hover_color="#AF1740",
+                                           image=rest_icon,
+                                           text="",
+                                           width=50,
                                            command=self.delete_search_data)
         self.delete_button.grid(row=0, column=0, sticky='we', padx=10, pady=10)
         self.patientsTreeFrame = ttk.Frame(self.search_patients_frame)
@@ -373,10 +489,15 @@ class PatientForm:
         # Configure each column
         for col in cols:
             # Set column heading with center alignment
-            self.patients_treeview.heading(col, text=col, anchor="center")
+            self.patients_treeview.heading(col, text=col,
+                                           command=lambda c=col: on_column_click(self.patients_treeview, c, False))
             # Set column width and data alignment
             self.patients_treeview.column(col, width=100, anchor="center")
 
+        # Bind the left-click event to the open_docx function
+        self.patients_treeview.bind("<Double-1>", lambda event: create_new_visit(event, self.patients_treeview))
+        # Bind the Enter key press event to the open_docx function
+        self.patients_treeview.bind("<Return>", lambda event: create_new_visit(event, self.patients_treeview))
         self.treeScroll.config(command=self.patients_treeview.yview)
         self.patients_treeview.pack(fill="both", expand=True)
 
@@ -414,10 +535,9 @@ class PatientForm:
         self.search_button.grid(row=0, column=1, sticky='we', padx=10, pady=10)
 
         self.delete_button = ctk.CTkButton(self.search_visits_frame,
-                                           text="איפוס",
-                                           width=100,
-                                           fg_color="red",
-                                           hover_color="#AF1740",
+                                           image=rest_icon,
+                                           text="",
+                                           width=50,
                                            command=self.delete_search_data)
         self.delete_button.grid(row=0, column=0, sticky='we', padx=10, pady=10)
 
@@ -432,7 +552,8 @@ class PatientForm:
         # Configure the style for the headings with a larger font
         self.treeViewStyle.configure("Custom.Treeview.Heading",
                                      font=("Arial", 14, "bold"))  # Font for headings
-
+        # Define columns and their headings
+        sort_directions = {}  # Dictionary to track sort direction for each column
         cols = ("תאריך ביקור", "טלפון", "גיל", "שם פרטי", "שם משפחה", "תעודה מזהה")
         self.visit_treeview = ttk.Treeview(self.treeFrame,
                                            show="headings",
@@ -444,7 +565,8 @@ class PatientForm:
         # Configure each column
         for col in cols:
             # Set column heading with center alignment
-            self.visit_treeview.heading(col, text=col, anchor="center")
+            self.visit_treeview.heading(col, text=col,
+                                        command=lambda c=col: on_column_click(self.visit_treeview, c, sort_directions))
 
             # Set column width and data alignment
             self.visit_treeview.column(col, width=100, anchor="center")
@@ -461,6 +583,9 @@ class PatientForm:
 
     def show_new_form(self):
 
+        self.new_form_button.configure(fg_color="#DD5746", hover_color="#C7253E")
+        self.search_visit_button.configure(fg_color="#3572EF")
+        self.search_patients_button.configure(fg_color="#3572EF")
         self.current_frame.pack_forget()
         self.parent_new_form_frame.pack(expand=True, fill="both", padx=20, pady=20)  # Make it responsive
         self.new_form_frame.pack(expand=True, padx=50, pady=50)
@@ -470,6 +595,9 @@ class PatientForm:
 
         self.search_visits_frame.pack(fill="both", expand=True)
         if self.current_frame != self.search_visits_frame:
+            self.search_visit_button.configure(fg_color="#DD5746", hover_color="#C7253E")
+            self.new_form_button.configure(fg_color="#3572EF")
+            self.search_patients_button.configure(fg_color="#3572EF")
             self.current_frame.pack_forget()
             self.parent_new_form_frame.pack_forget()
             self.current_frame = self.search_visits_frame
@@ -478,28 +606,12 @@ class PatientForm:
 
         self.search_patients_frame.pack(fill="both", expand=True)
         if self.current_frame != self.search_patients_frame:
+            self.search_patients_button.configure(fg_color="#DD5746", hover_color="#C7253E")
+            self.search_visit_button.configure(fg_color="#3572EF")
+            self.new_form_button.configure(fg_color="#3572EF")
             self.current_frame.pack_forget()
             self.parent_new_form_frame.pack_forget()
             self.current_frame = self.search_patients_frame
-
-    def calculate_age(self, birthdate_str):
-
-        try:
-            # Parse the birthdate string
-            birthdate = datetime.strptime(birthdate_str, '%d/%m/%Y')
-        except ValueError:
-            return None
-
-        # Calculate the current age
-        current_date = datetime.today()
-        age = current_date.year - birthdate.year
-
-        # Adjust for birthday not yet occurring this year
-        if current_date.month < birthdate.month or (
-                current_date.month == birthdate.month and current_date.day < birthdate.day):
-            age -= 1
-
-        return age
 
     def delete_search_data(self):
         self.search_entry.delete(0, tk.END)
@@ -519,11 +631,13 @@ class PatientForm:
         for row in results:
             row_with_age = list(row)  # Convert the tuple to a list
             birthdate_str = row[2]  # Assuming birthdate is the 3rd column
-            row_with_age[2] = self.calculate_age(birthdate_str)  # Replace birthdate with calculated age
+            row_with_age[2] = calculate_age(birthdate_str)  # Replace birthdate with calculated age
 
             self.visit_treeview.insert('', 'end', values=row_with_age)
 
     def collect_data(self):
+
+        self.error_is_raised = True
         first_name = self.f_name_entry.get()
         last_name = self.l_name_entry.get()
         ID = self.id_entry.get()
@@ -552,19 +666,30 @@ class PatientForm:
 
         # Get the current date in the desired format (e.g., dd-mm-yyyy)
         current_date = datetime.now().strftime('%d-%m-%Y')  # Use hyphens instead of slashes
-        age = self.calculate_age(birth_date)
+
+        age = calculate_age(birth_date)
         if db.check_patient_id_exists(ID):
             messagebox.showwarning("שגיאת קלט", "המטופל כבר קיים במערכת")
         else:
-            docx = create_docx(first_name, last_name, ID, age, current_date, phone)
-            db.insert_patient_record(first_name, last_name, ID, birth_date, phone)
-            db.insert_visit_record(ID, current_date, docx)
+            try:
+                db.insert_patient_record(first_name, last_name, ID, birth_date, phone)
+                docx = create_docx(first_name, last_name, ID, age, phone)
+                db.insert_visit_record(ID, current_date, docx)
+            except ValueError as e:
+                # Catch the validation error raised by insert_patient_record and show the error message
+                messagebox.showerror("Error", str(e))
+                self.error_is_raised = False
+            except Exception as e:
+                # Catch any other errors and show a generic error message
+                messagebox.showerror("Error", f"An unexpected error occurred: {str(e)}")
 
-        # Clear all entry widgets
-        self.f_name_entry.delete(0, tk.END)
-        self.l_name_entry.delete(0, tk.END)
-        self.id_entry.delete(0, tk.END)
-        self.phone_entry.delete(0, tk.END)
+        if self.error_is_raised:
+            # Clear all entry widgets
+            self.f_name_entry.delete(0, tk.END)
+            self.l_name_entry.delete(0, tk.END)
+            self.id_entry.delete(0, tk.END)
+            self.phone_entry.delete(0, tk.END)
+
         load_visit_data(self)
         load_patient_data(self)
 

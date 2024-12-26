@@ -115,7 +115,7 @@ def create_docx(f_name, l_name, id_num, age, phone):
     date = datetime.now().strftime('%d-%m-%Y')  # Use hyphens instead of slashes
 
     # Define the folder name for saving documents
-    folder_name = 'patients docx'
+    folder_name = 'My patients'
 
     # Get the current script's directory (adjust for PyInstaller's bundle)
     script_dir = os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(__file__))
