@@ -22,8 +22,17 @@ borders_widgets = (30, 20)
 color1 = "#176B87"
 color2 = "#64CCC5"
 
-image = Image.open("images/icons8-restart-50.png")
-rest_icon = ctk.CTkImage(dark_image=image, size=(20, 20))  # Adjust size as needed
+rest_image = Image.open("images/icons8-restart-50.png")
+rest_icon = ctk.CTkImage(dark_image=rest_image, size=(20, 20))  # Adjust size as needed
+
+new_user_image=Image.open("images/icons8-add-user-male-50.png")
+new_user_icon = ctk.CTkImage(dark_image=new_user_image, size=(20, 20))  # Adjust size as needed
+
+search_user_image=Image.open("images/icons8-find-user-male-50.png")
+search_user_icon = ctk.CTkImage(dark_image=search_user_image, size=(20, 20))  # Adjust size as needed
+
+search_form_image=Image.open("images/icons8-search-property-50.png")
+search_form_icon = ctk.CTkImage(dark_image=search_form_image, size=(20, 20))  # Adjust size as needed
 
 
 def sort_treeview_column(treeview, column, reverse):
@@ -273,18 +282,19 @@ class PatientForm:
         # Options frame (right side)
         self.options_frame = ctk.CTkFrame(self.root, fg_color=color2)  # Use ctk.CTkFrame directly
         self.options_frame.grid(row=0, column=1, sticky="ns")  # Stick to top and bottom
-        # Load an image using Pillow
+        # Load an rest_image using Pillow
         image = Image.open("logo/SmartDocLogo.png")
         ctk_image = CTkImage(light_image=image, size=(200, 100))
         self.error_is_raised = True
         self.logo_label = ctk.CTkLabel(
             self.options_frame,
             image=ctk_image,
-            text=""  # Set text to an empty string to only show the image
+            text=""  # Set text to an empty string to only show the rest_image
         )
         self.logo_label.pack(pady=(0, 150))
         # Adding buttons to options_frame
         self.new_form_button = ctk.CTkButton(self.options_frame,
+                                             image=new_user_icon,
                                              text="חדש מטופל",
                                              width=200,
                                              height=40,
@@ -292,12 +302,14 @@ class PatientForm:
         self.new_form_button.pack(pady=10)
         self.search_visit_button = ctk.CTkButton(self.options_frame,
                                                  text="ביקור חיפוש",
+                                                 image=search_form_icon,
                                                  width=200,
                                                  height=40,
                                                  command=self.show_visits_search_frame)
         self.search_visit_button.pack(pady=10)
         self.search_patients_button = ctk.CTkButton(self.options_frame,
                                                     text="מטופל חיפוש",
+                                                    image=search_user_icon,
                                                     width=200,
                                                     height=40,
                                                     command=self.show_patients_search_frame)
@@ -344,7 +356,7 @@ class PatientForm:
             self.new_form_frame,
             font=hebrew_font,
             width=250,
-            justify='right'
+
         )
         self.f_name_entry.grid(row=1, column=0, padx=padX_size, pady=borders_widgets, sticky=sticky_entry)
 
@@ -361,7 +373,7 @@ class PatientForm:
             self.new_form_frame,
             font=hebrew_font,
             width=250,
-            justify='right'
+
         )
         self.l_name_entry.grid(row=2, column=0, padx=padX_size, pady=padY_size,
                                sticky=sticky_entry)  # align the entry to the right
@@ -379,7 +391,7 @@ class PatientForm:
             self.new_form_frame,
             font=hebrew_font,
             width=250,
-            justify='right'
+
         )
         self.id_entry.grid(row=3, column=0, padx=padX_size, pady=padY_size, sticky=sticky_entry)
 
@@ -396,7 +408,7 @@ class PatientForm:
             self.new_form_frame,
             font=hebrew_font,
             width=250,
-            justify='right'
+
         )
         self.phone_entry.grid(row=4, column=0, padx=padX_size, pady=padY_size,
                               sticky=sticky_entry)  # align the entry to the right

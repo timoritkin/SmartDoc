@@ -264,14 +264,14 @@ class PatientForm:
         # Options frame (right side)
         self.options_frame = ctk.CTkFrame(self.root, fg_color=color2)  # Use ctk.CTkFrame directly
         self.options_frame.grid(row=0, column=1, sticky="ns")  # Stick to top and bottom
-        # Load an image using Pillow
+        # Load an rest_image using Pillow
         image = Image.open("logo/SmartDocLogo.png")
         ctk_image = CTkImage(light_image=image, size=(200, 100))
         self.error_is_raised = True
         self.logo_label = ctk.CTkLabel(
             self.options_frame,
             image=ctk_image,
-            text=""  # Set text to an empty string to only show the image
+            text=""  # Set text to an empty string to only show the rest_image
         )
         self.logo_label.pack(pady=(0, 150))
         # Adding buttons to options_frame
