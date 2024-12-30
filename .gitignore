@@ -1,10 +1,13 @@
 /build/
 /dist/
+__pycache__/
 *.spec
 # Ignore the main.exe file
 *.exe
 # Ignore all .db files
 *.db
 
+.idea/*
+!.idea/codeStyles/
 # Ignore the 'patient docx' folder
-patients docx/
+My patients/
