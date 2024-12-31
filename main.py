@@ -25,13 +25,13 @@ color2 = "#64CCC5"
 rest_image = Image.open("images/icons8-restart-50.png")
 rest_icon = ctk.CTkImage(dark_image=rest_image, size=(20, 20))  # Adjust size as needed
 
-new_user_image=Image.open("images/icons8-add-user-male-50.png")
+new_user_image = Image.open("images/icons8-add-user-male-50.png")
 new_user_icon = ctk.CTkImage(dark_image=new_user_image, size=(20, 20))  # Adjust size as needed
 
-search_user_image=Image.open("images/icons8-find-user-male-50.png")
+search_user_image = Image.open("images/icons8-find-user-male-50.png")
 search_user_icon = ctk.CTkImage(dark_image=search_user_image, size=(20, 20))  # Adjust size as needed
 
-search_form_image=Image.open("images/icons8-search-property-50.png")
+search_form_image = Image.open("images/icons8-search-property-50.png")
 search_form_icon = ctk.CTkImage(dark_image=search_form_image, size=(20, 20))  # Adjust size as needed
 
 
@@ -74,13 +74,14 @@ def on_column_click(treeview, column, sort_directions):
 
 
 def resource_path(relative_path):
-    """Get the absolute path to a resource, compatible with PyInstaller."""
-    try:
-        # Use the temp folder path when running as a PyInstaller bundle
-        base_path = sys._MEIPASS
-    except AttributeError:
-        # Use the current directory in normal execution
+    """ Get absolute path to resource, works for development and for cx_Freeze"""
+    if getattr(sys, 'frozen', False):  # Check if the app is frozen (packaged)
+        # cx_Freeze uses sys.executable for the base path
+        base_path = os.path.dirname(sys.executable)
+    else:
+        # Development mode
         base_path = os.path.abspath(".")
+
     return os.path.join(base_path, relative_path)
 
 
@@ -113,7 +114,6 @@ def open_word_document(event):
         messagebox.showwarning("Warning", "הקובץ לא נמצא")
 
 
-
 def create_directory(path):
     """Ensure a directory exists."""
     path.mkdir(parents=True, exist_ok=True)
@@ -138,7 +138,7 @@ def create_docx(f_name, l_name, id_num, age, phone):
     date = datetime.now().strftime('%d-%m-%Y')  # Use hyphens instead of slashes
 
     # Define base and patient-specific folders
-    script_dir = Path(sys._MEIPASS if getattr(sys, 'frozen', False) else __file__).parent
+    script_dir = Path(sys.executable if getattr(sys, 'frozen', False) else __file__).parent
     base_folder = script_dir / 'My patients'
     patient_folder = base_folder / f"{f_name}_{l_name}_{id_num}"
 
@@ -163,8 +163,6 @@ def create_docx(f_name, l_name, id_num, age, phone):
     return docx_path_str
 
 
-
-
 # user will be asked if they want to create new visit as a result new doc will be created
 def create_new_visit(event, tree):
     # Get the selected row (item) that was double-clicked
@@ -182,7 +180,7 @@ def create_new_visit(event, tree):
         # Prevent the window from being resized
         popup.resizable(False, False)
         popup_frame = ctk.CTkFrame(popup, fg_color=color1)  # Use ctk.CTkFrame directly
-        print(item_data[4])
+
         # Last Name
         question_label = ctk.CTkLabel(
             popup_frame,
@@ -656,7 +654,6 @@ class PatientForm:
         birth_date = self.calendar.get()
         phone = self.phone_entry.get()
         check_birth_date = birth_date
-        print(birth_date)
         if not first_name or not last_name or not birth_date or not ID or not phone:
             messagebox.showwarning("שגיאת קלט", " ! אנא מלא את כל השדות")
             return
