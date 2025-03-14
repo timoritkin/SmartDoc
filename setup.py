@@ -3,11 +3,13 @@ from cx_Freeze import setup, Executable
 
 # Dependencies are automatically detected, but may need fine-tuning.
 build_exe_options = {
-    "packages": ["os", "tkinter", "PIL", "docx", "lxml", "babel", "pytz", "pkg_resources", "platform", "xml", "sysconfig", "difflib", "multiprocessing", "zoneinfo", "jinja2", "sqlite3","customtkinter"],
+    "packages": ["os", "tkinter", "PIL", "docx", "lxml", "babel", "pytz", "pkg_resources", "platform", "xml",
+                 "sysconfig", "darkdetect",
+                 "difflib", "multiprocessing", "zoneinfo", "jinja2", "sqlite3", "customtkinter"],
     "excludes": [],
     "include_files": [
         ("images", "images"),  # Include the entire 'images' directory
-        ("logo/logo_icon.ico", "logo/logo_icon.ico"), # Include the icon
+        ("logo/logo_icon.ico", "logo/logo_icon.ico"),  # Include the icon
         ("logo", "logo"),
         ("template", "template"),
         # ("path/to/other_file.txt", "other_file.txt"), # Include individual files

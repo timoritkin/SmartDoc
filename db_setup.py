@@ -171,7 +171,7 @@ def get_docx_path(patient_id, visit_date):
         return None  # Return None if no matching record is found
 
 
-def search_patients(search_term):
+def search_patients_visits(search_term):
     """
     Search patients in the database based on a search term.
 
@@ -200,6 +200,44 @@ def search_patients(search_term):
 
     # Execute the query
     cursor.execute(query, (search_param, search_param, search_param, search_param, search_param))
+
+    # Fetch and process results
+    results = cursor.fetchall()
+
+    conn.commit()
+    conn.close()
+
+    return results
+
+
+def search_patients_data(search_term):
+    """
+    Search patients in the database based on a search term.
+
+    :param search_term: String to search for in patient records
+    :return: List of matching patient records
+    """
+    # Connect to the database
+    conn = sqlite3.connect("patients.db")
+    cursor = conn.cursor()
+
+    # Create a search query that checks multiple columns
+    query = """
+        SELECT p.phone_number, p.birthdate,  p.first_name,p.last_name, p.patient_id
+        FROM patients p
+
+        WHERE 
+            LOWER(p.first_name) LIKE ? OR 
+            LOWER(p.last_name) LIKE ? OR 
+            LOWER(p.birthdate) LIKE ? OR 
+            LOWER(p.patient_id) LIKE ?
+        """
+
+    # Use % wildcards for partial matching
+    search_param = f'%{search_term.lower()}%'
+
+    # Execute the query
+    cursor.execute(query, (search_param, search_param, search_param, search_param))
 
     # Fetch and process results
     results = cursor.fetchall()
