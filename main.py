@@ -34,6 +34,20 @@ search_user_icon = ctk.CTkImage(dark_image=search_user_image, size=(20, 20))  # 
 search_form_image = Image.open("images/icons8-search-property-50.png")
 search_form_icon = ctk.CTkImage(dark_image=search_form_image, size=(20, 20))  # Adjust size as needed
 
+# Get the user's AppData folder (C:\Users\YourUsername\AppData\Roaming)
+appdata_path = Path(os.getenv('APPDATA') or "") / 'SmartDoc'
+
+# Create a subfolder for your app inside AppData
+db_folder = os.path.join(appdata_path, 'Database')
+os.makedirs(db_folder, exist_ok=True)  # Ensure the folder exists
+
+# Full path to the database file
+db_path = os.path.join(db_folder, 'patients.db')
+
+# Define base and patient-specific folders inside AppData
+patients_base_folder = appdata_path / 'My Patients'
+patients_base_folder.mkdir(parents=True, exist_ok=True)
+
 
 def sort_treeview_column(treeview, column, reverse):
     """
@@ -94,7 +108,7 @@ def open_word_document(event):
     p_id = event.widget.item(selected_item, 'values')[5]
     # Retrieve file information
     visit_date = event.widget.item(selected_item, 'values')[0]
-    path = db.get_docx_path(p_id, visit_date)
+    path = db.get_docx_path(p_id, visit_date, db_path)
     # Get the document path from the database (adjust `db.get_docx_path` if necessary)
     if path:
         path = resource_path(path)
@@ -137,13 +151,15 @@ def create_docx(f_name, l_name, id_num, age, phone):
     # Get the current date in the desired format
     date = datetime.now().strftime('%d-%m-%Y')  # Use hyphens instead of slashes
 
-    # Define base and patient-specific folders
-    script_dir = Path(sys.executable if getattr(sys, 'frozen', False) else __file__).parent
-    base_folder = script_dir / 'My patients'
-    patient_folder = base_folder / f"{f_name}_{l_name}_{id_num}"
+    # Patient-specific folder
+    patient_folder = patients_base_folder / f"{f_name}_{l_name}_{id_num}"
+    patient_folder.mkdir(parents=True, exist_ok=True)
+
+    # Path for the Word document
+    word_file_path = patient_folder / f"{f_name}_{l_name}_{id_num}.docx"
 
     # Ensure folders exist
-    create_directory(base_folder)
+    create_directory(patients_base_folder)
     create_directory(patient_folder)
 
     # Prepare context for the document
@@ -196,7 +212,7 @@ def create_new_visit(event, tree):
                                        command=lambda: (
                                            (docx_path := create_docx(item_data[2], item_data[3], item_data[4],
                                                                      item_data[1], item_data[0])),
-                                           db.insert_visit_record(item_data[4], current_date, docx_path),
+                                           db.insert_visit_record(item_data[4], current_date, docx_path, db_path),
                                            popup.destroy()  # Close the popup window
                                        ))
 
@@ -218,7 +234,7 @@ def load_visit_data(self):
         self.visit_treeview.delete(item)
 
     # Fetch data and populate the Treeview
-    rows = db.fetch_visit_data()
+    rows = db.fetch_visit_data(db_path)
 
     for row in rows:
         birthdate_str = row[2]  # Example: row[2] is the birthdate column in 'dd/mm/yyyy' format
@@ -234,7 +250,7 @@ def load_patient_data(self):
         self.patients_treeview.delete(item)
 
     # Fetch data and populate the Treeview
-    rows = db.fetch_patient_data()
+    rows = db.fetch_patient_data(db_path)
 
     for row in rows:
         birthdate_str = row[1]  # Example: row[2] is the birthdate column in 'dd/mm/yyyy' format
@@ -644,7 +660,7 @@ class PatientForm:
             self.visit_treeview.delete(item)
 
         # Get search results from database
-        results = db.search_patients_visits(search_term)
+        results = db.search_patients_visits(search_term, db_path)
 
         # Reinsert matching items with calculated ages
         for row in results:
@@ -666,7 +682,7 @@ class PatientForm:
             self.patients_treeview.delete(item)
 
         # Get search results from database
-        results = db.search_patients_data(search_term)
+        results = db.search_patients_data(search_term, db_path)
 
         # Reinsert matching items with calculated ages
         for row in results:
@@ -708,13 +724,13 @@ class PatientForm:
         current_date = datetime.now().strftime('%d-%m-%Y')  # Use hyphens instead of slashes
 
         age = calculate_age(birth_date)
-        if db.check_patient_id_exists(ID):
+        if db.check_patient_id_exists(ID, db_path):
             messagebox.showwarning("שגיאת קלט", "המטופל כבר קיים במערכת")
         else:
             try:
-                db.insert_patient_record(first_name, last_name, ID, birth_date, phone)
+                db.insert_patient_record(first_name, last_name, ID, birth_date, phone, db_path)
                 docx = create_docx(first_name, last_name, ID, age, phone)
-                db.insert_visit_record(ID, current_date, docx)
+                db.insert_visit_record(ID, current_date, docx, db_path)
             except ValueError as e:
                 # Catch the validation error raised by insert_patient_record and show the error message
                 messagebox.showerror("Error", str(e))
@@ -736,7 +752,7 @@ class PatientForm:
 
 def main():
     # Call the function to create the tables
-    db.create_tables()
+    db.create_tables(db_path)
     root = ctk.CTk(fg_color=color1)  # create CTk window like you do with the Tk window
     PatientForm(root)
     root.mainloop()
