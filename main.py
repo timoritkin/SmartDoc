@@ -25,13 +25,13 @@ color2 = "#64CCC5"
 rest_image = Image.open("images/icons8-restart-50.png")
 rest_icon = ctk.CTkImage(dark_image=rest_image, size=(20, 20))  # Adjust size as needed
 
-new_user_image=Image.open("images/icons8-add-user-male-50.png")
+new_user_image = Image.open("images/icons8-add-user-male-50.png")
 new_user_icon = ctk.CTkImage(dark_image=new_user_image, size=(20, 20))  # Adjust size as needed
 
-search_user_image=Image.open("images/icons8-find-user-male-50.png")
+search_user_image = Image.open("images/icons8-find-user-male-50.png")
 search_user_icon = ctk.CTkImage(dark_image=search_user_image, size=(20, 20))  # Adjust size as needed
 
-search_form_image=Image.open("images/icons8-search-property-50.png")
+search_form_image = Image.open("images/icons8-search-property-50.png")
 search_form_icon = ctk.CTkImage(dark_image=search_form_image, size=(20, 20))  # Adjust size as needed
 
 
@@ -113,7 +113,6 @@ def open_word_document(event):
         messagebox.showwarning("Warning", "הקובץ לא נמצא")
 
 
-
 def create_directory(path):
     """Ensure a directory exists."""
     path.mkdir(parents=True, exist_ok=True)
@@ -165,6 +164,48 @@ def create_docx(f_name, l_name, id_num, age, phone):
 
 
 
+def adjust_data(tree):
+    selected_item = tree.selection()  # Get selected row
+    if not selected_item:  # If no row is selected, exit
+        return
+
+    item_data = tree.item(selected_item[0])["values"]  # Extract data
+
+    # Create a pop-up window for editing
+    popup = tk.Toplevel()
+    popup.title("עריכה")
+    popup.resizable(False, False)
+
+    popup_frame = ctk.CTkFrame(popup, fg_color=color1)
+    popup_frame.pack(padx=10, pady=10)
+
+    # Form Labels and Entry Fields
+    labels = ["טלפון", "גיל", "שם פרטי", "שם משפחה", "תעודת זהות"]
+    fields = {}
+
+    for i, label_text in enumerate(labels):
+        label = ctk.CTkLabel(popup_frame, text=label_text, font=hebrew_font)
+        label.grid(row=i, column=1, padx=10, pady=5, sticky="e")
+
+        entry_var = ctk.StringVar(value=item_data[i])  # Pre-fill with data
+        entry = ctk.CTkEntry(popup_frame, textvariable=entry_var, width=250)
+        entry.grid(row=i, column=0, padx=10, pady=5, sticky="w")
+
+        fields[label_text] = entry_var  # Store for later use
+
+    # Submit Button to Save Changes
+    create_button = ctk.CTkButton(
+        popup_frame,
+        text="עדכן נתונים",
+        width=250,
+        height=40,
+        command=lambda: db.update_patient_record(fields, tree, selected_item[0], popup)
+    )
+    create_button.grid(row=len(labels), column=0, columnspan=2, pady=(10, 20))
+
+
+
+
 # user will be asked if they want to create new visit as a result new doc will be created
 def create_new_visit(event, tree):
     # Get the selected row (item) that was double-clicked
@@ -178,19 +219,19 @@ def create_new_visit(event, tree):
 
         # Create a new window (pop-up)
         popup = tk.Toplevel()
-        popup.title("Pop-up Window")
+        popup.title("ביקור יצירת")
         # Prevent the window from being resized
         popup.resizable(False, False)
         popup_frame = ctk.CTkFrame(popup, fg_color=color1)  # Use ctk.CTkFrame directly
         print(item_data[4])
         # Last Name
-        question_label = ctk.CTkLabel(
+        new_record_label = ctk.CTkLabel(
             popup_frame,
             text=f"? האם ליצור עבור המטופל {item_data[2]} {item_data[3]} ביקור חדש ",
             font=hebrew_font,
             anchor="e"
         )
-        question_label.grid(row=0, column=0, columnspan=2, padx=padX_size, pady=padY_size, sticky='nswe')
+        new_record_label.grid(row=0, column=0, columnspan=2, padx=padX_size, pady=padY_size, sticky='nswe')
 
         confirm_button = ctk.CTkButton(popup_frame,
                                        text="אישור",
@@ -198,7 +239,8 @@ def create_new_visit(event, tree):
                                        command=lambda: ((docx_path := create_docx(item_data[2], item_data[3],
                                                                                   item_data[4], item_data[1],
                                                                                   item_data[0])),
-                                                        db.insert_visit_record(item_data[4], current_date, docx_path)))
+                                                        db.insert_visit_record(item_data[4], current_date, docx_path),
+                                                        popup.destroy()))
 
         confirm_button.grid(row=1, column=1, sticky='we', padx=10, pady=10)
 
@@ -356,6 +398,7 @@ class PatientForm:
             self.new_form_frame,
             font=hebrew_font,
             width=250,
+            state="normal"
 
         )
         self.f_name_entry.grid(row=1, column=0, padx=padX_size, pady=borders_widgets, sticky=sticky_entry)
@@ -373,6 +416,7 @@ class PatientForm:
             self.new_form_frame,
             font=hebrew_font,
             width=250,
+            state="normal"
 
         )
         self.l_name_entry.grid(row=2, column=0, padx=padX_size, pady=padY_size,
@@ -391,6 +435,7 @@ class PatientForm:
             self.new_form_frame,
             font=hebrew_font,
             width=250,
+            state="normal"
 
         )
         self.id_entry.grid(row=3, column=0, padx=padX_size, pady=padY_size, sticky=sticky_entry)
@@ -408,6 +453,7 @@ class PatientForm:
             self.new_form_frame,
             font=hebrew_font,
             width=250,
+            state="normal"
 
         )
         self.phone_entry.grid(row=4, column=0, padx=padX_size, pady=padY_size,
@@ -429,12 +475,14 @@ class PatientForm:
             width=24,  # Increase the width to make it bigger
             background="darkblue",
             foreground="white",
-            font=("Arial", 16)  # Adjust the font size to make the text inside the widget bigger
+            font=("Arial", 16),  # Adjust the font size to make the text inside the widget bigger
+            state="normal"
+
         )
         self.calendar.grid(row=5, column=0, padx=padX_size, pady=padY_size, sticky=sticky_entry)
         # Submit Button
         self.create_button = ctk.CTkButton(self.new_form_frame,
-                                           text="WORD קובץ צור  ",
+                                           text="חדש מטופל צור  ",
                                            width=250,
                                            height=100,
                                            command=self.collect_data)
@@ -442,61 +490,77 @@ class PatientForm:
 
         ###################################################################################################
 
-        self.search_patients_frame = ctk.CTkFrame(self.main_frame, fg_color=color1)  # Use ctk.CTkFrame directly
-        # Configure column weights to make the layout responsive
-        self.search_patients_frame.columnconfigure(0, weight=1)  # Search button
-        self.search_patients_frame.columnconfigure(1, weight=1)  # Search entry
-        self.search_patients_frame.columnconfigure(2, weight=3)  # Label
-        self.search_patients_frame.rowconfigure(1, weight=1)  # Make treeFrame's row expandable
+        # Frame for search section
+        self.search_patients_frame = ctk.CTkFrame(self.main_frame, fg_color=color1)
+
+        #  Configure column weights properly
+        self.search_patients_frame.columnconfigure(0, weight=1)  # Edit button
+        self.search_patients_frame.columnconfigure(1, weight=1)  # Delete button
+        self.search_patients_frame.columnconfigure(2, weight=1)  # Search button
+        self.search_patients_frame.columnconfigure(3, weight=3)  # Expandable search entry
+        self.search_patients_frame.columnconfigure(4, weight=2)  # Label
+
+        #  Search Label
         self.search_label = ctk.CTkLabel(
             self.search_patients_frame,
             text="חיפוש מטופל",
             font=hebrew_font,
-            anchor="center"
+            anchor="center",
         )
-        self.search_label.grid(row=0, column=3, padx=10, pady=5, sticky='we')
+        self.search_label.grid(row=0, column=4, padx=10, pady=10, sticky='we')
 
+        #  Search Entry (expandable)
         self.search_entry = ctk.CTkEntry(
             self.search_patients_frame,
             font=hebrew_font,
-
+            state="normal",
             justify='right'
         )
-        self.search_entry.grid(row=0, column=2, padx=10, pady=10, sticky='we')
+        self.search_entry.grid(row=0, column=3, padx=10, pady=10, sticky='we')  # Will expand
         self.search_entry.bind("<Return>", self.search_data)
 
-        # Search Button
-        self.search_button = ctk.CTkButton(self.search_patients_frame,
-                                           text="חיפוש",
-                                           width=100,
-                                           command=self.search_data)
-        self.search_button.grid(row=0, column=1, sticky='we', padx=10, pady=10)
+        #  Search Button
+        self.search_button = ctk.CTkButton(
+            self.search_patients_frame,
+            text="חיפוש",
+            command=self.search_data
+        )
+        self.search_button.grid(row=0, column=2, sticky='we', padx=10, pady=10)
 
-        self.delete_button = ctk.CTkButton(self.search_patients_frame,
-                                           image=rest_icon,
-                                           text="",
-                                           width=50,
-                                           command=self.delete_search_data)
-        self.delete_button.grid(row=0, column=0, sticky='we', padx=10, pady=10)
+        #  Delete Button
+        self.delete_button = ctk.CTkButton(
+            self.search_patients_frame,
+            image=rest_icon,
+            text="",
+            command=self.delete_search_data
+        )
+        self.delete_button.grid(row=0, column=1, sticky='we', padx=10, pady=10)
+
+
+        #  TreeView Frame (Expandable)
+        self.search_patients_frame.rowconfigure(1, weight=1)  # Allow row expansion
+
         self.patientsTreeFrame = ttk.Frame(self.search_patients_frame)
-        self.patientsTreeFrame.grid(row=1, column=0, padx=10, pady=10, columnspan=4, sticky='nswe')
+        self.patientsTreeFrame.grid(row=1, column=0, padx=10, pady=10, columnspan=5, sticky='nswe')
 
         self.treeScroll = ttk.Scrollbar(self.patientsTreeFrame)
         self.treeScroll.pack(side="right", fill="y")
-        self.treeViewStyle = ttk.Style()
-        self.treeViewStyle.configure("Custom.Treeview",
-                                     font=("Arial ", 12))
-        # Configure the style for the headings with a larger font
-        self.treeViewStyle.configure("Custom.Treeview.Heading",
-                                     font=("Arial", 14, "bold"))  # Font for headings
 
+        # Style for Treeview
+        self.treeViewStyle = ttk.Style()
+        self.treeViewStyle.configure("Custom.Treeview", font=("Arial ", 12))
+        self.treeViewStyle.configure("Custom.Treeview.Heading", font=("Arial", 14, "bold"))
+
+        # Columns for Treeview
         cols = ("טלפון", "גיל", "שם פרטי", "שם משפחה", "תעודה מזהה")
-        self.patients_treeview = ttk.Treeview(self.patientsTreeFrame,
-                                              show="headings",
-                                              yscrollcommand=self.treeScroll.set,
-                                              columns=cols,
-                                              height=13,
-                                              style="Custom.Treeview")
+        self.patients_treeview = ttk.Treeview(
+            self.patientsTreeFrame,
+            show="headings",
+            yscrollcommand=self.treeScroll.set,
+            columns=cols,
+            height=13,
+            style="Custom.Treeview"
+        )
 
         # Configure each column
         for col in cols:
@@ -512,6 +576,15 @@ class PatientForm:
         self.patients_treeview.bind("<Return>", lambda event: create_new_visit(event, self.patients_treeview))
         self.treeScroll.config(command=self.patients_treeview.yview)
         self.patients_treeview.pack(fill="both", expand=True)
+
+
+        #  Edit Button
+        self.edit_button = ctk.CTkButton(
+            self.search_patients_frame,
+            text="עריכה",
+            command=lambda: adjust_data(self.patients_treeview)
+        )
+        self.edit_button.grid(row=0, column=0, sticky='we', padx=10, pady=10)
 
         ###################################################################################################
         self.search_visits_frame = ctk.CTkFrame(self.main_frame, fg_color=color1)  # Use ctk.CTkFrame directly
@@ -533,7 +606,7 @@ class PatientForm:
         self.search_entry = ctk.CTkEntry(
             self.search_visits_frame,
             font=hebrew_font,
-
+            state="normal",
             justify='right'
         )
         self.search_entry.grid(row=0, column=2, padx=10, pady=10, sticky='we')
@@ -685,8 +758,8 @@ class PatientForm:
         else:
             try:
                 db.insert_patient_record(first_name, last_name, ID, birth_date, phone)
-                docx = create_docx(first_name, last_name, ID, age, phone)
-                db.insert_visit_record(ID, current_date, docx)
+                # docx = create_docx(first_name, last_name, ID, age, phone)
+                # db.insert_visit_record(ID, current_date, docx)
             except ValueError as e:
                 # Catch the validation error raised by insert_patient_record and show the error message
                 messagebox.showerror("Error", str(e))

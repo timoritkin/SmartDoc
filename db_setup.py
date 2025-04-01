@@ -31,7 +31,7 @@ def create_tables():
             first_name VARCHAR  (50) NOT NULL,
             last_name VARCHAR (50) NOT NULL,
             birthdate VARCHAR (11) NOT NULL,
-            phone_number VARCHAR (10) NOT NULL 
+            phone_number TEXT NOT NULL CHECK (LENGTH(phone_number) = 10)
         )
         """)
 
@@ -231,3 +231,52 @@ def check_patient_id_exists(patient_id):
 
     # Return True if the patient_id exists, False otherwise
     return result is not None
+
+
+def refresh_treeview(tree):
+    # Connect to the SQLite database (change 'your_database.db' to your database file)
+    conn = sqlite3.connect('patients.db')
+    cursor = conn.cursor()
+
+    """ Reloads the Treeview with updated data from SQLite """
+    for row in tree.get_children():
+        tree.delete(row)  # Clear old data
+
+    query = "SELECT phone_number, birthdate ,first_name, last_name, patient_id FROM patients"
+    records = cursor.execute(query).fetchall()
+
+    for record in records:
+        tree.insert("", "end", values=record)  # Insert updated data
+
+
+def update_patient_record(fields, tree, popup):
+    # Connect to the SQLite database (change 'your_database.db' to your database file)
+    conn = sqlite3.connect('patients.db')
+    cursor = conn.cursor()
+
+    """ Updates the patient record in the SQLite database """
+    new_data = {key: fields[key].get() for key in fields}  # Get updated values
+
+    # Extract individual values
+    first_name = new_data["שם פרטי"]
+    last_name = new_data["שם משפחה"]
+    patient_id = new_data["תעודת זהות"]
+    phone = new_data["טלפון"]
+    birth_date = new_data["גיל"]
+
+    # Update database
+    query = """UPDATE patients 
+               SET first_name = ?, last_name = ?, phone_number = ?, birthdate = ?
+               WHERE patient_id = ?"""
+    values = (first_name, last_name, phone, birth_date, patient_id)
+
+    cursor.execute(query, values)
+
+    conn.commit()
+    # Close the connection
+    conn.close()
+    # Refresh TreeView
+    refresh_treeview(tree)
+
+    # Close the popup
+    popup.destroy()
