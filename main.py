@@ -136,6 +136,12 @@ def create_docx(f_name, l_name, id_num, age, phone):
     # Get the current date in the desired format
     date = datetime.now().strftime('%d-%m-%Y')  # Use hyphens instead of slashes
 
+    # add the zero to the phone number
+    phone = str(phone)
+    if not phone.startswith("0") and len(phone) == 9:
+        phone = "0" + phone
+    print(phone)
+
     # Define base and patient-specific folders
     script_dir = Path(sys._MEIPASS if getattr(sys, 'frozen', False) else __file__).parent
     base_folder = script_dir / 'My patients'
@@ -162,8 +168,6 @@ def create_docx(f_name, l_name, id_num, age, phone):
     return docx_path_str
 
 
-
-
 def adjust_data(tree):
     selected_item = tree.selection()  # Get selected row
     if not selected_item:  # If no row is selected, exit
@@ -187,23 +191,42 @@ def adjust_data(tree):
         label = ctk.CTkLabel(popup_frame, text=label_text, font=hebrew_font)
         label.grid(row=i, column=1, padx=10, pady=5, sticky="e")
 
-        entry_var = ctk.StringVar(value=item_data[i])  # Pre-fill with data
-        entry = ctk.CTkEntry(popup_frame, textvariable=entry_var, width=250)
-        entry.grid(row=i, column=0, padx=10, pady=5, sticky="w")
-
-        fields[label_text] = entry_var  # Store for later use
+        if label_text == "גיל":
+            # Convert string to datetime object
+            try:
+                birth_date = datetime.strptime(str(item_data[i]), "%d/%m/%Y")
+            except ValueError:
+                try:
+                    birth_date = datetime.strptime(str(item_data[i]), "%Y-%m-%d")  # alternate format
+                except ValueError:
+                    birth_date = datetime.today()  # fallback
+            calendar = DateEntry(
+                popup_frame,
+                date_pattern='dd/mm/yyyy',
+                width=24,
+                background="darkblue",
+                foreground="white",
+                font=("Arial", 13),
+                state="normal"
+            )
+            calendar.set_date(birth_date)
+            calendar.grid(row=i, column=0, padx=10, pady=5, sticky="w")
+            fields[label_text] = calendar  # Store the widget (not StringVar!)
+        else:
+            entry_var = ctk.StringVar(value=item_data[i])  # Pre-fill with data
+            entry = ctk.CTkEntry(popup_frame, textvariable=entry_var, width=250)
+            entry.grid(row=i, column=0, padx=10, pady=5, sticky="w")
+            fields[label_text] = entry_var
 
     # Submit Button to Save Changes
     create_button = ctk.CTkButton(
         popup_frame,
-        text="עדכן נתונים",
+        text="נתונים עדכן",
         width=250,
         height=40,
-        command=lambda: db.update_patient_record(fields, tree, selected_item[0], popup)
+        command=lambda: db.update_patient_record(fields, tree, popup)
     )
     create_button.grid(row=len(labels), column=0, columnspan=2, pady=(10, 20))
-
-
 
 
 # user will be asked if they want to create new visit as a result new doc will be created
@@ -223,7 +246,12 @@ def create_new_visit(event, tree):
         # Prevent the window from being resized
         popup.resizable(False, False)
         popup_frame = ctk.CTkFrame(popup, fg_color=color1)  # Use ctk.CTkFrame directly
+        print(item_data[0])
+        print(item_data[1])
+        print(item_data[2])
+        print(item_data[3])
         print(item_data[4])
+
         # Last Name
         new_record_label = ctk.CTkLabel(
             popup_frame,
@@ -510,20 +538,20 @@ class PatientForm:
         self.search_label.grid(row=0, column=4, padx=10, pady=10, sticky='we')
 
         #  Search Entry (expandable)
-        self.search_entry = ctk.CTkEntry(
+        self.search_patients_entry = ctk.CTkEntry(
             self.search_patients_frame,
             font=hebrew_font,
             state="normal",
             justify='right'
         )
-        self.search_entry.grid(row=0, column=3, padx=10, pady=10, sticky='we')  # Will expand
-        self.search_entry.bind("<Return>", self.search_data)
+        self.search_patients_entry.grid(row=0, column=3, padx=10, pady=10, sticky='we')  # Will expand
+        self.search_patients_entry.bind("<Return>", self.search_patient_data)
 
         #  Search Button
         self.search_button = ctk.CTkButton(
             self.search_patients_frame,
             text="חיפוש",
-            command=self.search_data
+            command=self.search_patient_data
         )
         self.search_button.grid(row=0, column=2, sticky='we', padx=10, pady=10)
 
@@ -532,10 +560,9 @@ class PatientForm:
             self.search_patients_frame,
             image=rest_icon,
             text="",
-            command=self.delete_search_data
+            command=self.delete_patient_data
         )
         self.delete_button.grid(row=0, column=1, sticky='we', padx=10, pady=10)
-
 
         #  TreeView Frame (Expandable)
         self.search_patients_frame.rowconfigure(1, weight=1)  # Allow row expansion
@@ -577,7 +604,6 @@ class PatientForm:
         self.treeScroll.config(command=self.patients_treeview.yview)
         self.patients_treeview.pack(fill="both", expand=True)
 
-
         #  Edit Button
         self.edit_button = ctk.CTkButton(
             self.search_patients_frame,
@@ -603,20 +629,27 @@ class PatientForm:
         )
         self.search_label.grid(row=0, column=3, padx=10, pady=5, sticky='we')
 
-        self.search_entry = ctk.CTkEntry(
+        self.search_visits_entry = ctk.CTkEntry(
             self.search_visits_frame,
             font=hebrew_font,
-            state="normal",
+
             justify='right'
         )
-        self.search_entry.grid(row=0, column=2, padx=10, pady=10, sticky='we')
-        self.search_entry.bind("<Return>", self.search_data)
+
+        self.search_visits = ctk.CTkEntry(
+            self.search_visits_frame,
+            font=hebrew_font,
+
+            justify='right'
+        )
+        self.search_visits_entry.grid(row=0, column=2, padx=10, pady=10, sticky='we')
+        self.search_visits_entry.bind("<Return>", self.search_visit_data)
 
         # Search Button
         self.search_button = ctk.CTkButton(self.search_visits_frame,
                                            text="חיפוש",
                                            width=100,
-                                           command=self.search_data)
+                                           command=self.search_visit_data)
         self.search_button.grid(row=0, column=1, sticky='we', padx=10, pady=10)
 
         self.delete_button = ctk.CTkButton(self.search_visits_frame,
@@ -699,18 +732,18 @@ class PatientForm:
             self.current_frame = self.search_patients_frame
 
     def delete_search_data(self):
-        self.search_entry.delete(0, tk.END)
-        self.search_data()
+        self.search_visits_entry.delete(0, tk.END)
+        load_visit_data(self)
 
-    def search_data(self, event=None):
-        search_term = self.search_entry.get()
+    def search_visit_data(self, event=None):
+        search_term = self.search_visits_entry.get()
 
         # Clear existing items in visit_treeview
         for item in self.visit_treeview.get_children():
             self.visit_treeview.delete(item)
 
         # Get search results from database
-        results = db.search_patients(search_term)
+        results = db.search_patients_visits(search_term)
 
         # Reinsert matching items with calculated ages
         for row in results:
@@ -719,6 +752,31 @@ class PatientForm:
             row_with_age[2] = calculate_age(birthdate_str)  # Replace birthdate with calculated age
 
             self.visit_treeview.insert('', 'end', values=row_with_age)
+
+    def delete_patient_data(self):
+        self.search_patients_entry.delete(0, tk.END)
+        load_patient_data(self)
+
+    def search_patient_data(self, event=None):
+        search_term = self.search_patients_entry.get()
+
+        # Clear existing items in visit_treeview
+        for item in self.patients_treeview.get_children():
+            self.patients_treeview.delete(item)
+
+        # Get search results from database
+        results = db.search_patients_data(search_term)
+
+        # Reinsert matching items with calculated ages
+        for row in results:
+            row_with_age = list(row)
+            birthdate_str = row[1]
+            row_with_age[1] = calculate_age(birthdate_str)
+
+            # Convert all values to string to avoid losing leading zeros
+            row_with_age_str = [str(value) for value in row_with_age]
+
+            self.patients_treeview.insert('', 'end', values=row_with_age_str)
 
     def collect_data(self):
 
