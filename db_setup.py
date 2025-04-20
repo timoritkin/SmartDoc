@@ -13,9 +13,9 @@ def validate_input(patient_id, phone):
     return True
 
 
-def create_tables():
+def create_tables(db_path):
     # Connect to SQLite database (or create it if it doesn't exist)
-    conn = sqlite3.connect("patients.db")
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Enable foreign key constraint enforcement (important for SQLite)
@@ -56,9 +56,9 @@ def create_tables():
     conn.close()
 
 
-def fetch_visit_data():
+def fetch_visit_data(db_path):
     """Fetch data from the SQLite database."""
-    conn = sqlite3.connect("patients.db")
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Query to fetch patient and visit details (without docx_path)
@@ -75,9 +75,9 @@ def fetch_visit_data():
     return rows
 
 
-def fetch_patient_data():
+def fetch_patient_data(db_path):
     """Fetch data from the SQLite database."""
-    conn = sqlite3.connect("patients.db")
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Query to fetch patient and visit details (without docx_path)
@@ -94,8 +94,8 @@ def fetch_patient_data():
     return rows
 
 
-def insert_visit_record(ID, current_date, docx_path):
-    conn = sqlite3.connect('patients.db')
+def insert_visit_record(ID, current_date, docx_path, db_path):
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     try:
@@ -112,13 +112,13 @@ def insert_visit_record(ID, current_date, docx_path):
         conn.close()
 
 
-def insert_patient_record(first_name, last_name, patient_id, birthdate, phone):
+def insert_patient_record(first_name, last_name, patient_id, birthdate, phone, db_path):
     """ Inserts a new patient record into the SQLite database. """
     # Validate the patient ID
     validate_input(patient_id, phone)  # This will raise an error if the ID is invalid
 
     # Connect to the SQLite database
-    conn = sqlite3.connect("patients.db")
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Insert the patient record into the patients table
@@ -132,14 +132,14 @@ def insert_patient_record(first_name, last_name, patient_id, birthdate, phone):
     conn.close()
 
 
-def get_docx_path(patient_id, visit_date):
+def get_docx_path(patient_id, visit_date, db_path):
     """
        Retrieve the docx path for a specific patient, optionally filtered by visit date or visit ID.
        """
     import sqlite3
 
     # Connect to SQLite database
-    conn = sqlite3.connect("patients.db")
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Base query
@@ -171,7 +171,7 @@ def get_docx_path(patient_id, visit_date):
         return None  # Return None if no matching record is found
 
 
-def search_patients_visits(search_term):
+def search_patients_visits(search_term, db_path):
     """
     Search patients in the database based on a search term.
 
@@ -179,7 +179,7 @@ def search_patients_visits(search_term):
     :return: List of matching patient records
     """
     # Connect to the database
-    conn = sqlite3.connect("patients.db")
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Create a search query that checks multiple columns
@@ -210,7 +210,7 @@ def search_patients_visits(search_term):
     return results
 
 
-def search_patients_data(search_term):
+def search_patients_data(search_term, db_path):
     """
     Search patients in the database based on a search term.
 
@@ -218,7 +218,7 @@ def search_patients_data(search_term):
     :return: List of matching patient records
     """
     # Connect to the database
-    conn = sqlite3.connect("patients.db")
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Create a search query that checks multiple columns
@@ -249,9 +249,9 @@ def search_patients_data(search_term):
 
 
 # Function to check if patient_id exists in the database
-def check_patient_id_exists(patient_id):
+def check_patient_id_exists(patient_id, db_path):
     # Connect to the SQLite database (change 'your_database.db' to your database file)
-    conn = sqlite3.connect('patients.db')
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Prepare the query to check if patient_id exists
@@ -271,9 +271,9 @@ def check_patient_id_exists(patient_id):
     return result is not None
 
 
-def refresh_treeview(tree):
+def refresh_treeview(tree, db_path):
     # Connect to the SQLite database (change 'your_database.db' to your database file)
-    conn = sqlite3.connect('patients.db')
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     """ Reloads the Treeview with updated data from SQLite """
@@ -287,9 +287,9 @@ def refresh_treeview(tree):
         tree.insert("", "end", values=record)  # Insert updated data
 
 
-def update_patient_record(fields, tree, popup):
+def update_patient_record(fields, tree, popup, db_path):
     # Connect to the SQLite database (change 'your_database.db' to your database file)
-    conn = sqlite3.connect('patients.db')
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     """ Updates the patient record in the SQLite database """
@@ -318,3 +318,15 @@ def update_patient_record(fields, tree, popup):
 
     # Close the popup
     popup.destroy()
+
+
+def get_patient_birthdate(patient_id, db_path):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Fetch birthdate string from DB
+    cursor.execute("SELECT birthdate FROM patients WHERE patient_id = ?", (patient_id,))
+    result = cursor.fetchone()
+
+    conn.close()
+    return result

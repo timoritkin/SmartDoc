@@ -34,6 +34,20 @@ search_user_icon = ctk.CTkImage(dark_image=search_user_image, size=(20, 20))  # 
 search_form_image = Image.open("images/icons8-search-property-50.png")
 search_form_icon = ctk.CTkImage(dark_image=search_form_image, size=(20, 20))  # Adjust size as needed
 
+# Get the user's AppData folder (C:\Users\YourUsername\AppData\Roaming)
+appdata_path = Path(os.getenv('APPDATA') or "") / 'SmartDoc'
+
+# Create a subfolder for your app inside AppData
+db_folder = os.path.join(appdata_path, 'Database')
+os.makedirs(db_folder, exist_ok=True)  # Ensure the folder exists
+
+# Full path to the database file
+db_path = os.path.join(db_folder, 'patients.db')
+
+# Define base and patient-specific folders inside AppData
+patients_base_folder = appdata_path / 'My Patients'
+patients_base_folder.mkdir(parents=True, exist_ok=True)
+
 
 def sort_treeview_column(treeview, column, reverse):
     """
@@ -93,7 +107,7 @@ def open_word_document(event):
     p_id = event.widget.item(selected_item, 'values')[5]
     # Retrieve file information
     visit_date = event.widget.item(selected_item, 'values')[0]
-    path = db.get_docx_path(p_id, visit_date)
+    path = db.get_docx_path(p_id, visit_date, db_path)
     # Get the document path from the database (adjust `db.get_docx_path` if necessary)
     if path:
         path = resource_path(path)
@@ -191,15 +205,20 @@ def adjust_data(tree):
         label = ctk.CTkLabel(popup_frame, text=label_text, font=hebrew_font)
         label.grid(row=i, column=1, padx=10, pady=5, sticky="e")
 
-        if label_text == "גיל":
-            # Convert string to datetime object
-            try:
-                birth_date = datetime.strptime(str(item_data[i]), "%d/%m/%Y")
-            except ValueError:
-                try:
-                    birth_date = datetime.strptime(str(item_data[i]), "%Y-%m-%d")  # alternate format
-                except ValueError:
-                    birth_date = datetime.today()  # fallback
+        if label_text == "טלפון":
+            # add the zero to the phone number
+            phone = str(item_data[i])
+            if not phone.startswith("0") and len(phone) == 9:
+                phone = "0" + phone
+            print(phone)
+
+            entry_var = ctk.StringVar(value=phone)  # Pre-fill with data
+            entry = ctk.CTkEntry(popup_frame, textvariable=entry_var, width=250)
+            entry.grid(row=i, column=0, padx=10, pady=5, sticky="w")
+            fields[label_text] = entry_var
+
+        elif label_text == "גיל":
+            patient_birthdate = db.get_patient_birthdate(item_data[4], db_path)
             calendar = DateEntry(
                 popup_frame,
                 date_pattern='dd/mm/yyyy',
@@ -209,7 +228,7 @@ def adjust_data(tree):
                 font=("Arial", 13),
                 state="normal"
             )
-            calendar.set_date(birth_date)
+            calendar.set_date(patient_birthdate[0])
             calendar.grid(row=i, column=0, padx=10, pady=5, sticky="w")
             fields[label_text] = calendar  # Store the widget (not StringVar!)
         else:
@@ -224,7 +243,7 @@ def adjust_data(tree):
         text="נתונים עדכן",
         width=250,
         height=40,
-        command=lambda: db.update_patient_record(fields, tree, popup)
+        command=lambda: db.update_patient_record(fields, tree, popup, db_path)
     )
     create_button.grid(row=len(labels), column=0, columnspan=2, pady=(10, 20))
 
@@ -267,7 +286,8 @@ def create_new_visit(event, tree):
                                        command=lambda: ((docx_path := create_docx(item_data[2], item_data[3],
                                                                                   item_data[4], item_data[1],
                                                                                   item_data[0])),
-                                                        db.insert_visit_record(item_data[4], current_date, docx_path),
+                                                        db.insert_visit_record(item_data[4], current_date, docx_path,
+                                                                               db_path),
                                                         popup.destroy()))
 
         confirm_button.grid(row=1, column=1, sticky='we', padx=10, pady=10)
@@ -288,7 +308,7 @@ def load_visit_data(self):
         self.visit_treeview.delete(item)
 
     # Fetch data and populate the Treeview
-    rows = db.fetch_visit_data()
+    rows = db.fetch_visit_data(db_path)
 
     for row in rows:
         birthdate_str = row[2]  # Example: row[2] is the birthdate column in 'dd/mm/yyyy' format
@@ -304,7 +324,7 @@ def load_patient_data(self):
         self.patients_treeview.delete(item)
 
     # Fetch data and populate the Treeview
-    rows = db.fetch_patient_data()
+    rows = db.fetch_patient_data(db_path)
 
     for row in rows:
         birthdate_str = row[1]  # Example: row[2] is the birthdate column in 'dd/mm/yyyy' format
@@ -743,7 +763,7 @@ class PatientForm:
             self.visit_treeview.delete(item)
 
         # Get search results from database
-        results = db.search_patients_visits(search_term)
+        results = db.search_patients_visits(search_term, db_path)
 
         # Reinsert matching items with calculated ages
         for row in results:
@@ -765,7 +785,7 @@ class PatientForm:
             self.patients_treeview.delete(item)
 
         # Get search results from database
-        results = db.search_patients_data(search_term)
+        results = db.search_patients_data(search_term, db_path)
 
         # Reinsert matching items with calculated ages
         for row in results:
@@ -811,13 +831,13 @@ class PatientForm:
         current_date = datetime.now().strftime('%d-%m-%Y')  # Use hyphens instead of slashes
 
         age = calculate_age(birth_date)
-        if db.check_patient_id_exists(ID):
+        if db.check_patient_id_exists(ID, db_path):
             messagebox.showwarning("שגיאת קלט", "המטופל כבר קיים במערכת")
         else:
             try:
-                db.insert_patient_record(first_name, last_name, ID, birth_date, phone)
-                # docx = create_docx(first_name, last_name, ID, age, phone)
-                # db.insert_visit_record(ID, current_date, docx)
+                db.insert_patient_record(first_name, last_name, ID, birth_date, phone, db_path)
+                docx = create_docx(first_name, last_name, ID, age, phone)
+                db.insert_visit_record(ID, current_date, docx, db_path)
             except ValueError as e:
                 # Catch the validation error raised by insert_patient_record and show the error message
                 messagebox.showerror("Error", str(e))
@@ -839,7 +859,7 @@ class PatientForm:
 
 def main():
     # Call the function to create the tables
-    db.create_tables()
+    db.create_tables(db_path)
     root = ctk.CTk(fg_color=color1)  # create CTk window like you do with the Tk window
     PatientForm(root)
     root.mainloop()
