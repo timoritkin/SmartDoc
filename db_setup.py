@@ -1,4 +1,5 @@
 import sqlite3
+import time
 
 
 # Validate the ID
@@ -271,61 +272,118 @@ def check_patient_id_exists(patient_id, db_path):
     return result is not None
 
 
-def refresh_treeview(tree, db_path):
-    # Connect to the SQLite database (change 'your_database.db' to your database file)
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+def update_patient_record(fields, old_patient_id, tree, db_path, max_retries=5):
+    conn = None
+    for attempt in range(max_retries):
+        try:
+            # Close any existing connection before attempting a new one
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass
 
-    """ Reloads the Treeview with updated data from SQLite """
-    for row in tree.get_children():
-        tree.delete(row)  # Clear old data
+            # Create a new connection with a longer timeout
+            conn = sqlite3.connect(db_path, timeout=30)
+            cursor = conn.cursor()
 
-    query = "SELECT phone_number, birthdate ,first_name, last_name, patient_id FROM patients"
-    records = cursor.execute(query).fetchall()
+            # Enable immediate transaction mode but with error handling
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+            except sqlite3.OperationalError as e:
+                if "database is locked" in str(e):
+                    # If locked, close connection, wait longer, and retry
+                    conn.close()
+                    time.sleep(2 * (attempt + 1))  # Exponential backoff
+                    continue
+                else:
+                    raise
 
-    for record in records:
-        tree.insert("", "end", values=record)  # Insert updated data
+            # Extract updated values
+            new_data = {}
+            for key in fields:
+                if key == "גיל":
+                    try:
+                        if hasattr(fields[key], 'get_date'):
+                            new_data[key] = fields[key].get_date().strftime('%d/%m/%Y')
+                        else:
+                            new_data[key] = fields[key].get()
+                    except Exception:
+                        new_data[key] = ""
+                else:
+                    new_data[key] = fields[key].get()
 
+            # Extract individual values
+            first_name = new_data["שם פרטי"]
+            last_name = new_data["שם משפחה"]
+            new_patient_id = new_data["תעודת זהות"]
+            phone = str(new_data["טלפון"])
+            birth_date = new_data.get("גיל", "")
 
-def update_patient_record(fields, tree, popup, db_path):
-    # Connect to the SQLite database (change 'your_database.db' to your database file)
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+            # If patient ID has changed, update the visits table first
+            if str(new_patient_id) != str(old_patient_id):
+                cursor.execute("""
+                    UPDATE visits 
+                    SET patient_id = ? 
+                    WHERE patient_id = ?
+                """, (new_patient_id, old_patient_id))
 
-    """ Updates the patient record in the SQLite database """
-    new_data = {key: fields[key].get() for key in fields}  # Get updated values
+            # Then update the patient record
+            cursor.execute("""
+                UPDATE patients 
+                SET patient_id = ?, first_name = ?, last_name = ?, birthdate = ?, phone_number = ?
+                WHERE patient_id = ?
+            """, (new_patient_id, first_name, last_name, birth_date, phone, old_patient_id))
 
-    # Extract individual values
-    first_name = new_data["שם פרטי"]
-    last_name = new_data["שם משפחה"]
-    patient_id = new_data["תעודת זהות"]
-    phone = str(new_data["טלפון"])
-    birth_date = new_data["גיל"]
+            conn.commit()
+            conn.close()
+            return True  # Success
 
-    # Update database
-    query = """UPDATE patients 
-               SET first_name = ?, last_name = ?, birthdate = ?,phone_number = ?
-               WHERE patient_id = ?"""
-    values = (first_name, last_name, birth_date, phone, patient_id)
+        except sqlite3.OperationalError as e:
+            if "database is locked" in str(e) and attempt < max_retries - 1:
+                # Wait longer between retries with exponential backoff
+                wait_time = 2 * (attempt + 1)
+                time.sleep(wait_time)
+                continue
+            else:
+                # Close the connection even if there's an error
+                if conn:
+                    try:
+                        conn.close()
+                    except:
+                        pass
+                print(f"Database error after {attempt + 1} attempts: {str(e)}")
+                raise  # Re-raise the exception
+        except Exception as e:
+            # Handle any other exceptions
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass
+            print(f"Unexpected error: {str(e)}")
+            raise
 
-    cursor.execute(query, values)
-
-    conn.commit()
-    # Close the connection
-    conn.close()
-    # Refresh TreeView
-    # refresh_treeview(tree)
-
-    # Close the popup
-    popup.destroy()
-
-
+    # If we've exhausted all retries
+    raise sqlite3.OperationalError("Failed to update patient record after maximum retries")
 def get_patient_birthdate(patient_id, db_path):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Fetch birthdate string from DB
     cursor.execute("SELECT birthdate FROM patients WHERE patient_id = ?", (patient_id,))
+    result = cursor.fetchone()
+
+    conn.close()
+    return result
+
+
+def get_patient_docx_path(patient_id, db_path):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    print(patient_id)
+    # Fetch birthdate string from DB
+    cursor.execute("SELECT docx_path FROM visits WHERE patient_id = ?", (patient_id,))
     result = cursor.fetchone()
 
     conn.close()

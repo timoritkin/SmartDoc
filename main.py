@@ -4,14 +4,15 @@ import sys
 import time
 import tkinter as tk
 from datetime import datetime
-from pathlib import Path
 from tkinter import messagebox, ttk
+from docx import Document
 from docxtpl import DocxTemplate
 import db_setup as db
 import customtkinter as ctk
 from PIL import Image
 from tkcalendar import DateEntry
 from customtkinter import CTkImage
+from pathlib import Path
 
 hebrew_font = ("Arial", 16, "bold")
 padX_size = (30, 30)
@@ -34,19 +35,101 @@ search_user_icon = ctk.CTkImage(dark_image=search_user_image, size=(20, 20))  # 
 search_form_image = Image.open("images/icons8-search-property-50.png")
 search_form_icon = ctk.CTkImage(dark_image=search_form_image, size=(20, 20))  # Adjust size as needed
 
-# Get the user's AppData folder (C:\Users\YourUsername\AppData\Roaming)
-appdata_path = Path(os.getenv('APPDATA') or "") / 'SmartDoc'
+# Get the user's Local AppData folder (C:\Users\YourUsername\AppData\Local)
+local_appdata_path = Path(os.getenv('LOCALAPPDATA') or "") / 'SmartDoc'
 
-# Create a subfolder for your app inside AppData
-db_folder = os.path.join(appdata_path, 'Database')
-os.makedirs(db_folder, exist_ok=True)  # Ensure the folder exists
+# Create a subfolder for your app inside Local AppData
+db_folder = local_appdata_path / 'Database'
+db_folder.mkdir(parents=True, exist_ok=True)  # Ensure the folder exists
 
 # Full path to the database file
-db_path = os.path.join(db_folder, 'patients.db')
+db_path = db_folder / 'patients.db'
 
-# Define base and patient-specific folders inside AppData
-patients_base_folder = appdata_path / 'My Patients'
+# Define base and patient-specific folders inside Local AppData
+patients_base_folder = local_appdata_path / 'My Patients'
 patients_base_folder.mkdir(parents=True, exist_ok=True)
+
+
+def update_text_in_docx(old_data, new_data):
+    text_to_update = {}
+    labels = ["טלפון", "גיל", "שם פרטי", "שם משפחה", "תעודת זהות"]
+
+    new_patient_data = {}
+    for key in new_data:
+        if key == "גיל":
+            new_patient_data[key] = new_data[key].get_date().strftime('%d/%m/%Y')
+            new_patient_data[key] = calculate_age(new_patient_data[key])
+            print(new_patient_data[key])
+        else:
+            new_patient_data[key] = new_data[key].get()
+
+    for i in range(len(labels)):
+        old_value = str(old_data[i])
+        label = labels[i]
+        new_value = str(new_patient_data[label])
+        if old_value != new_value:
+            text_to_update[old_value] = new_value
+
+    # Get the path to the existing .docx file
+    print(old_data[4])
+    file_path_tuple = db.get_patient_docx_path(new_data["תעודת זהות"].get(), db_path)
+    print(file_path_tuple)
+    file_path = Path(file_path_tuple[0])  # Use Path directly
+
+    if not file_path.exists():
+        print(" File not found:", file_path)
+        return
+    if file_path.suffix.lower() != ".docx":
+        print(" Not a .docx file:", file_path)
+        return
+
+    try:
+        doc = Document(str(file_path))
+    except Exception as e:
+        print(" Failed to load document:", e)
+        return
+
+    # Perform replacements in tables
+    for old_text, new_text in text_to_update.items():
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for paragraph in cell.paragraphs:
+                        for run in paragraph.runs:
+                            if old_text in run.text:
+                                run.text = run.text.replace(old_text, new_text)
+
+    # Save the updated document to the same path (overwrite it)
+    doc.save(str(file_path))
+    print(" Updated and saved document at:", file_path)
+
+
+def update_age_of_patient_in_docx(old_age, new_age, path):
+    file = Path(path)
+    if not file.exists():
+        print(" File not found:", file)
+        return
+    if file.suffix.lower() != ".docx":
+        print(" Not a .docx file:", file)
+        return
+
+    try:
+        doc = Document(str(file))
+    except Exception as e:
+        print(" Failed to load document:", e)
+        return
+
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    for run in paragraph.runs:
+                        if old_age in run.text:
+                            run.text = run.text.replace(old_age, new_age)
+
+    # Save the updated document to the same path (overwrite it)
+    doc.save(str(file))
+    print(" Updated and saved document at:", file)
 
 
 def sort_treeview_column(treeview, column, reverse):
@@ -105,15 +188,28 @@ def open_word_document(event):
     if not selected_item:
         return
     p_id = event.widget.item(selected_item, 'values')[5]
+    p_current_age = event.widget.item(selected_item, 'values')[2]  # maybe the age changed
+
     # Retrieve file information
     visit_date = event.widget.item(selected_item, 'values')[0]
     path = db.get_docx_path(p_id, visit_date, db_path)
+    p_birthdate = db.get_patient_birthdate(p_id, db_path)
+    p_new_age = calculate_age(p_birthdate[0])
+    print(p_current_age)
+    print(p_new_age)
+    print(path)
     # Get the document path from the database (adjust `db.get_docx_path` if necessary)
     if path:
         path = resource_path(path)
     # Resolve the full path for bundled environments
     if path and os.path.exists(path):
         try:
+            if str(p_new_age) != p_current_age:
+                print("there is different age for the patient")
+                update_age_of_patient_in_docx(p_current_age, p_new_age, path)
+            else:
+                print("there is no difference")
+
             # Use the default application to open the file
             if os.name == 'nt':  # Windows
                 os.startfile(path)
@@ -143,43 +239,51 @@ def open_file(file_path):
 
 
 def create_docx(f_name, l_name, id_num, age, phone):
+    """
+    Create a customized document from a template for a patient.
+
+    Args:
+        f_name (str): Patient's first name
+        l_name (str): Patient's last name
+        id_num (str): Patient's ID number
+        age (str/int): Patient's age
+        phone (str): Patient's phone number
+
+    Returns:
+        str: Path to the created document
+    """
     # Load the template using resource_path
     template_path = resource_path('template/Clalit mushlam template.docx')
     doc = DocxTemplate(template_path)
 
     # Get the current date in the desired format
-    date = datetime.now().strftime('%d-%m-%Y')  # Use hyphens instead of slashes
+    date = datetime.now().strftime('%d-%m-%Y')
 
-    # add the zero to the phone number
+    # Format phone number - add leading zero if needed
     phone = str(phone)
     if not phone.startswith("0") and len(phone) == 9:
         phone = "0" + phone
-    print(phone)
 
-    # Define base and patient-specific folders
-    script_dir = Path(sys._MEIPASS if getattr(sys, 'frozen', False) else __file__).parent
-    base_folder = script_dir / 'My patients'
-    patient_folder = base_folder / f"{f_name}_{l_name}_{id_num}"
+    # Create patient folder structure
+    patient_folder = patients_base_folder / f"{f_name}_{l_name}_{id_num}"
+    create_directory(patient_folder)  # Using the create_directory function consistently
 
-    # Ensure folders exist
-    create_directory(base_folder)
-    create_directory(patient_folder)
+    # Create filename with date included
+    file_name = f"{f_name}_{l_name}_{id_num}_{date}.docx"
+    file_path = patient_folder / file_name
 
     # Prepare context for the document
     context = {'f_name': f_name, 'l_name': l_name, 'id': id_num, 'age': age, 'phone': phone}
 
     # Render and save the document
-    file_name = f"{f_name}_{l_name}_{id_num}_{date}.docx"
-    file_path = patient_folder / file_name
     doc.render(context)
     doc.save(file_path)
 
     # Open the document automatically
     open_file(file_path)
-    # Convert file_path to a string before passing to insert
-    docx_path_str = str(file_path)
 
-    return docx_path_str
+    # Return the path as a string
+    return str(file_path)
 
 
 def adjust_data(tree):
@@ -188,7 +292,8 @@ def adjust_data(tree):
         return
 
     item_data = tree.item(selected_item[0])["values"]  # Extract data
-
+    patient_id = item_data[4]
+    print("the id is", patient_id)
     # Create a pop-up window for editing
     popup = tk.Toplevel()
     popup.title("עריכה")
@@ -210,6 +315,7 @@ def adjust_data(tree):
             phone = str(item_data[i])
             if not phone.startswith("0") and len(phone) == 9:
                 phone = "0" + phone
+                item_data[i] = phone
             print(phone)
 
             entry_var = ctk.StringVar(value=phone)  # Pre-fill with data
@@ -237,13 +343,18 @@ def adjust_data(tree):
             entry.grid(row=i, column=0, padx=10, pady=5, sticky="w")
             fields[label_text] = entry_var
 
+    def update_everything():
+        db.update_patient_record(fields, patient_id, tree, db_path)
+
+        update_text_in_docx(item_data, fields)
+        popup.destroy()
     # Submit Button to Save Changes
     create_button = ctk.CTkButton(
         popup_frame,
         text="נתונים עדכן",
         width=250,
         height=40,
-        command=lambda: db.update_patient_record(fields, tree, popup, db_path)
+        command=update_everything
     )
     create_button.grid(row=len(labels), column=0, columnspan=2, pady=(10, 20))
 
@@ -309,7 +420,7 @@ def load_visit_data(self):
 
     # Fetch data and populate the Treeview
     rows = db.fetch_visit_data(db_path)
-
+    print(rows)
     for row in rows:
         birthdate_str = row[2]  # Example: row[2] is the birthdate column in 'dd/mm/yyyy' format
         age = calculate_age(birthdate_str)
@@ -733,6 +844,7 @@ class PatientForm:
 
         self.search_visits_frame.pack(fill="both", expand=True)
         if self.current_frame != self.search_visits_frame:
+            load_visit_data(self)
             self.search_visit_button.configure(fg_color="#DD5746", hover_color="#C7253E")
             self.new_form_button.configure(fg_color="#3572EF")
             self.search_patients_button.configure(fg_color="#3572EF")
@@ -744,6 +856,7 @@ class PatientForm:
 
         self.search_patients_frame.pack(fill="both", expand=True)
         if self.current_frame != self.search_patients_frame:
+            load_visit_data(self)
             self.search_patients_button.configure(fg_color="#DD5746", hover_color="#C7253E")
             self.search_visit_button.configure(fg_color="#3572EF")
             self.new_form_button.configure(fg_color="#3572EF")
