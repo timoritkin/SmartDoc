@@ -5,8 +5,8 @@ import time
 # Validate the ID
 def validate_input(patient_id, phone):
     # Check if ID is a 9-digit integer
-    if len(patient_id) != 9 or not patient_id.isdigit():
-        raise ValueError("תעודת זהות אמורה להכיל 9 מספרים")
+    # if len(patient_id) != 9 or not patient_id.isdigit():
+    #     raise ValueError("תעודת זהות אמורה להכיל 9 מספרים")
 
     if len(phone) != 10 or not phone.isdigit():
         raise ValueError("מספר טלפון אמור להכיל 10 מספרים")
