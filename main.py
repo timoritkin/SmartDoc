@@ -131,6 +131,21 @@ def update_age_of_patient_in_docx(old_age, new_age, path):
     doc.save(str(file))
     print(" Updated and saved document at:", file)
 
+=======
+# Get the user's AppData folder (C:\Users\YourUsername\AppData\Roaming)
+appdata_path = Path(os.getenv('APPDATA') or "") / 'SmartDoc'
+
+# Create a subfolder for your app inside AppData
+db_folder = os.path.join(appdata_path, 'Database')
+os.makedirs(db_folder, exist_ok=True)  # Ensure the folder exists
+
+# Full path to the database file
+db_path = os.path.join(db_folder, 'patients.db')
+
+# Define base and patient-specific folders inside AppData
+patients_base_folder = appdata_path / 'My Patients'
+patients_base_folder.mkdir(parents=True, exist_ok=True)
+
 
 def sort_treeview_column(treeview, column, reverse):
     """
@@ -171,13 +186,14 @@ def on_column_click(treeview, column, sort_directions):
 
 
 def resource_path(relative_path):
-    """Get the absolute path to a resource, compatible with PyInstaller."""
-    try:
-        # Use the temp folder path when running as a PyInstaller bundle
-        base_path = sys._MEIPASS
-    except AttributeError:
-        # Use the current directory in normal execution
+    """ Get absolute path to resource, works for development and for cx_Freeze"""
+    if getattr(sys, 'frozen', False):  # Check if the app is frozen (packaged)
+        # cx_Freeze uses sys.executable for the base path
+        base_path = os.path.dirname(sys.executable)
+    else:
+        # Development mode
         base_path = os.path.abspath(".")
+
     return os.path.join(base_path, relative_path)
 
 
@@ -198,6 +214,7 @@ def open_word_document(event):
     print(p_current_age)
     print(p_new_age)
     print(path)
+
     # Get the document path from the database (adjust `db.get_docx_path` if necessary)
     if path:
         path = resource_path(path)
@@ -263,6 +280,7 @@ def create_docx(f_name, l_name, id_num, age, phone):
     phone = str(phone)
     if not phone.startswith("0") and len(phone) == 9:
         phone = "0" + phone
+
 
     # Create patient folder structure
     patient_folder = patients_base_folder / f"{f_name}_{l_name}_{id_num}"
@@ -376,11 +394,13 @@ def create_new_visit(event, tree):
         # Prevent the window from being resized
         popup.resizable(False, False)
         popup_frame = ctk.CTkFrame(popup, fg_color=color1)  # Use ctk.CTkFrame directly
+
         print(item_data[0])
         print(item_data[1])
         print(item_data[2])
         print(item_data[3])
         print(item_data[4])
+
 
         # Last Name
         new_record_label = ctk.CTkLabel(
@@ -401,6 +421,7 @@ def create_new_visit(event, tree):
                                                                                db_path),
                                                         popup.destroy()))
 
+
         confirm_button.grid(row=1, column=1, sticky='we', padx=10, pady=10)
 
         denied_button = ctk.CTkButton(popup_frame,
@@ -420,7 +441,9 @@ def load_visit_data(self):
 
     # Fetch data and populate the Treeview
     rows = db.fetch_visit_data(db_path)
+
     print(rows)
+
     for row in rows:
         birthdate_str = row[2]  # Example: row[2] is the birthdate column in 'dd/mm/yyyy' format
         age = calculate_age(birthdate_str)
@@ -669,12 +692,14 @@ class PatientForm:
         self.search_label.grid(row=0, column=4, padx=10, pady=10, sticky='we')
 
         #  Search Entry (expandable)
+
         self.search_patients_entry = ctk.CTkEntry(
             self.search_patients_frame,
             font=hebrew_font,
             state="normal",
             justify='right'
         )
+
         self.search_patients_entry.grid(row=0, column=3, padx=10, pady=10, sticky='we')  # Will expand
         self.search_patients_entry.bind("<Return>", self.search_patient_data)
 
@@ -697,6 +722,7 @@ class PatientForm:
 
         #  TreeView Frame (Expandable)
         self.search_patients_frame.rowconfigure(1, weight=1)  # Allow row expansion
+
 
         self.patientsTreeFrame = ttk.Frame(self.search_patients_frame)
         self.patientsTreeFrame.grid(row=1, column=0, padx=10, pady=10, columnspan=5, sticky='nswe')
@@ -902,6 +928,7 @@ class PatientForm:
 
         # Reinsert matching items with calculated ages
         for row in results:
+
             row_with_age = list(row)
             birthdate_str = row[1]
             row_with_age[1] = calculate_age(birthdate_str)
@@ -910,6 +937,7 @@ class PatientForm:
             row_with_age_str = [str(value) for value in row_with_age]
 
             self.patients_treeview.insert('', 'end', values=row_with_age_str)
+
 
     def collect_data(self):
 
@@ -920,7 +948,6 @@ class PatientForm:
         birth_date = self.calendar.get()
         phone = self.phone_entry.get()
         check_birth_date = birth_date
-        print(birth_date)
         if not first_name or not last_name or not birth_date or not ID or not phone:
             messagebox.showwarning("שגיאת קלט", " ! אנא מלא את כל השדות")
             return

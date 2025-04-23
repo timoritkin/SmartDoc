@@ -10,4 +10,7 @@ __pycache__/
 .idea/*
 !.idea/codeStyles/
 # Ignore the 'patient docx' folder
+
 My patients/
+*.egg-info/
+
