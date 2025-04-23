@@ -1,11 +1,12 @@
 import sqlite3
+import time
 
 
 # Validate the ID
 def validate_input(patient_id, phone):
     # Check if ID is a 9-digit integer
-    if len(patient_id) != 9 or not patient_id.isdigit():
-        raise ValueError("תעודת זהות אמורה להכיל 9 מספרים")
+    # if len(patient_id) != 9 or not patient_id.isdigit():
+    #     raise ValueError("תעודת זהות אמורה להכיל 9 מספרים")
 
     if len(phone) != 10 or not phone.isdigit():
         raise ValueError("מספר טלפון אמור להכיל 10 מספרים")
@@ -31,7 +32,7 @@ def create_tables(db_path):
             first_name VARCHAR  (50) NOT NULL,
             last_name VARCHAR (50) NOT NULL,
             birthdate VARCHAR (11) NOT NULL,
-            phone_number VARCHAR (10) NOT NULL 
+            phone_number TEXT NOT NULL CHECK (LENGTH(phone_number) = 10)
         )
         """)
 
@@ -269,3 +270,121 @@ def check_patient_id_exists(patient_id, db_path):
 
     # Return True if the patient_id exists, False otherwise
     return result is not None
+
+
+def update_patient_record(fields, old_patient_id, tree, db_path, max_retries=5):
+    conn = None
+    for attempt in range(max_retries):
+        try:
+            # Close any existing connection before attempting a new one
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass
+
+            # Create a new connection with a longer timeout
+            conn = sqlite3.connect(db_path, timeout=30)
+            cursor = conn.cursor()
+
+            # Enable immediate transaction mode but with error handling
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+            except sqlite3.OperationalError as e:
+                if "database is locked" in str(e):
+                    # If locked, close connection, wait longer, and retry
+                    conn.close()
+                    time.sleep(2 * (attempt + 1))  # Exponential backoff
+                    continue
+                else:
+                    raise
+
+            # Extract updated values
+            new_data = {}
+            for key in fields:
+                if key == "גיל":
+                    try:
+                        if hasattr(fields[key], 'get_date'):
+                            new_data[key] = fields[key].get_date().strftime('%d/%m/%Y')
+                        else:
+                            new_data[key] = fields[key].get()
+                    except Exception:
+                        new_data[key] = ""
+                else:
+                    new_data[key] = fields[key].get()
+
+            # Extract individual values
+            first_name = new_data["שם פרטי"]
+            last_name = new_data["שם משפחה"]
+            new_patient_id = new_data["תעודת זהות"]
+            phone = str(new_data["טלפון"])
+            birth_date = new_data.get("גיל", "")
+
+            # If patient ID has changed, update the visits table first
+            if str(new_patient_id) != str(old_patient_id):
+                cursor.execute("""
+                    UPDATE visits 
+                    SET patient_id = ? 
+                    WHERE patient_id = ?
+                """, (new_patient_id, old_patient_id))
+
+            # Then update the patient record
+            cursor.execute("""
+                UPDATE patients 
+                SET patient_id = ?, first_name = ?, last_name = ?, birthdate = ?, phone_number = ?
+                WHERE patient_id = ?
+            """, (new_patient_id, first_name, last_name, birth_date, phone, old_patient_id))
+
+            conn.commit()
+            conn.close()
+            return True  # Success
+
+        except sqlite3.OperationalError as e:
+            if "database is locked" in str(e) and attempt < max_retries - 1:
+                # Wait longer between retries with exponential backoff
+                wait_time = 2 * (attempt + 1)
+                time.sleep(wait_time)
+                continue
+            else:
+                # Close the connection even if there's an error
+                if conn:
+                    try:
+                        conn.close()
+                    except:
+                        pass
+                print(f"Database error after {attempt + 1} attempts: {str(e)}")
+                raise  # Re-raise the exception
+        except Exception as e:
+            # Handle any other exceptions
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass
+            print(f"Unexpected error: {str(e)}")
+            raise
+
+    # If we've exhausted all retries
+    raise sqlite3.OperationalError("Failed to update patient record after maximum retries")
+def get_patient_birthdate(patient_id, db_path):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Fetch birthdate string from DB
+    cursor.execute("SELECT birthdate FROM patients WHERE patient_id = ?", (patient_id,))
+    result = cursor.fetchone()
+
+    conn.close()
+    return result
+
+
+def get_patient_docx_path(patient_id, db_path):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    print(patient_id)
+    # Fetch birthdate string from DB
+    cursor.execute("SELECT docx_path FROM visits WHERE patient_id = ?", (patient_id,))
+    result = cursor.fetchone()
+
+    conn.close()
+    return result
