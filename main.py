@@ -131,21 +131,6 @@ def update_age_of_patient_in_docx(old_age, new_age, path):
     doc.save(str(file))
     print(" Updated and saved document at:", file)
 
-=======
-# Get the user's AppData folder (C:\Users\YourUsername\AppData\Roaming)
-appdata_path = Path(os.getenv('APPDATA') or "") / 'SmartDoc'
-
-# Create a subfolder for your app inside AppData
-db_folder = os.path.join(appdata_path, 'Database')
-os.makedirs(db_folder, exist_ok=True)  # Ensure the folder exists
-
-# Full path to the database file
-db_path = os.path.join(db_folder, 'patients.db')
-
-# Define base and patient-specific folders inside AppData
-patients_base_folder = appdata_path / 'My Patients'
-patients_base_folder.mkdir(parents=True, exist_ok=True)
-
 
 def sort_treeview_column(treeview, column, reverse):
     """
