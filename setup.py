@@ -3,9 +3,13 @@ from cx_Freeze import setup, Executable
 
 # Dependencies are automatically detected, but may need fine-tuning.
 build_exe_options = {
-    "packages": ["os", "tkinter", "PIL", "docx", "lxml", "babel", "pytz", "pkg_resources", "platform", "xml",
-                 "sysconfig", "darkdetect",
-                 "difflib", "multiprocessing", "zoneinfo", "jinja2", "sqlite3", "customtkinter"],
+    "packages": [
+        "os", "tkinter", "PIL", "docx", "lxml", "babel", "pytz",
+        "pkg_resources", "platform", "xml", "sysconfig", "darkdetect",
+        "difflib", "multiprocessing", "zoneinfo", "jinja2", "sqlite3",
+        "customtkinter", "subprocess", "datetime", "time", "docxtpl",
+        "tkcalendar", "pathlib", "db_setup"
+    ],
     "excludes": [],
     "include_files": [
         ("images", "images"),  # Include the entire 'images' directory
@@ -21,7 +25,7 @@ base = "Win32GUI" if sys.platform == "win32" else None
 
 setup(
     name="SmartDoc",
-    version="1.0",
+    version="1.1.0",
     description="Make Docx easier for doctors ",
     options={"build_exe": build_exe_options},
     executables=[Executable("main.py", base=base, target_name="SmartDoc.exe", icon="logo/logo_icon.ico")]
