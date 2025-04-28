@@ -104,6 +104,7 @@ def update_text_in_docx(old_data, new_data):
     print(" Updated and saved document at:", file_path)
 
 
+
 def update_age_of_patient_in_docx(old_age, new_age, path):
     file = Path(path)
     if not file.exists():
@@ -200,7 +201,7 @@ def open_word_document(event):
     print(p_new_age)
     print(path)
 
-    # Get the document path from the database (adjust `db.get_docx_path` if necessary)
+    # Get the document path from the database
     if path:
         path = resource_path(path)
     # Resolve the full path for bundled environments
