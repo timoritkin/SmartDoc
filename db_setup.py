@@ -405,3 +405,25 @@ def update_docx_path(patient_id, new_docx_path, db_path):
 
     conn.commit()
     conn.close()
+
+
+#
+# def backup_db(db_path, backup_folder, t_minutes=1):
+#     os.makedirs(backup_folder, exist_ok=True)
+#
+#     while True:
+#         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+#         backup_path = os.path.join(backup_folder, f"backup_{timestamp}.db")
+#
+#         try:
+#             src = sqlite3.connect(db_path)
+#             dst = sqlite3.connect(backup_path)
+#             src.backup(dst)  # Full safe backup
+#             dst.close()
+#             src.close()
+#             print(f"[{timestamp}] Backup completed: {backup_path}")
+#         except Exception as e:
+#             print(f"[{timestamp}] Backup failed: {e}")
+#
+#         time.sleep(t_minutes * 60)  # wait t minutes
+#

@@ -36,19 +36,52 @@ search_user_icon = ctk.CTkImage(dark_image=search_user_image, size=(20, 20))  # 
 search_form_image = Image.open("images/icons8-search-property-50.png")
 search_form_icon = ctk.CTkImage(dark_image=search_form_image, size=(20, 20))  # Adjust size as needed
 
-# Get the user's Local AppData folder (C:\Users\YourUsername\AppData\Local)
-local_appdata_path = Path(os.getenv('LOCALAPPDATA') or "") / 'SmartDoc'
+# Get the user's home directory
+user_home_dir = os.path.expanduser("~")
 
-# Create a subfolder for your app inside Local AppData
-db_folder = local_appdata_path / 'Database'
+# Create the folder path inside the user's home directory
+user_folder_path = Path(user_home_dir) / 'SmartDoc'
+
+# Create a suborder for your app inside Local AppData
+db_folder = user_folder_path / 'Database'
 db_folder.mkdir(parents=True, exist_ok=True)  # Ensure the folder exists
 
 # Full path to the database file
 db_path = db_folder / 'patients.db'
 
 # Define base and patient-specific folders inside Local AppData
-patients_base_folder = local_appdata_path / 'My Patients'
+patients_base_folder = user_folder_path / 'My Patients'
 patients_base_folder.mkdir(parents=True, exist_ok=True)
+
+
+# def docx_backup(src_folder, backup_root, interval_minutes=1):
+#     while True:
+#         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+#         backup_path = os.path.join(backup_root, f"backup_{timestamp}")
+#         try:
+#             shutil.copytree(src_folder, backup_path)
+#             print(f"[{timestamp}] Backup created at: {backup_path}")
+#         except Exception as e:
+#             print(f"Backup failed: {e}")
+#         time.sleep(interval_minutes * 60)
+#
+#
+# def start_periodic_backup_thread():
+#     backup_folder = Path(user_home_dir) / 'SmartDocs_backup'
+#     db_backup_path = backup_folder/ 'Database'
+#     docx_backup_path= backup_folder/ 'My Patients'
+#     t_minutes = 2  # change this to any interval you want
+#
+#     thread_db_backup = threading.Thread(
+#         target=db.backup_db,
+#         args=(db_path, db_backup_path, t_minutes),
+#         daemon=True
+#     )
+#     thread_db_backup.start()
+#
+#     thread_docx_backup = threading.Thread(target=docx_backup,
+#     args=(patients_base_folder, docx_backup_path), daemon=True)
+#     thread_docx_backup.start()
 
 
 def update_text_in_docx(old_data, new_data):
@@ -399,7 +432,7 @@ def adjust_data(tree):
     # Submit Button to Save Changes
     create_button = ctk.CTkButton(
         popup_frame,
-        text="נתונים עדכן",
+        text="עדכן נתונים",
         width=250,
         height=40,
         command=update_everything
@@ -1025,6 +1058,7 @@ class PatientForm:
 
 def main():
     # Call the function to create the tables
+    # start_periodic_backup_thread()
     db.create_tables(db_path)
     root = ctk.CTk(fg_color=color1)  # create CTk window like you do with the Tk window
     PatientForm(root)
