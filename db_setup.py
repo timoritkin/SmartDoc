@@ -272,7 +272,7 @@ def check_patient_id_exists(patient_id, db_path):
     return result is not None
 
 
-def update_patient_record(fields, old_patient_id, tree, db_path, max_retries=5):
+def update_patient_record(fields, old_patient_id, db_path, max_retries=5):
     conn = None
     for attempt in range(max_retries):
         try:
@@ -366,6 +366,8 @@ def update_patient_record(fields, old_patient_id, tree, db_path, max_retries=5):
 
     # If we've exhausted all retries
     raise sqlite3.OperationalError("Failed to update patient record after maximum retries")
+
+
 def get_patient_birthdate(patient_id, db_path):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -388,3 +390,18 @@ def get_patient_docx_path(patient_id, db_path):
 
     conn.close()
     return result
+
+
+def update_docx_path(patient_id, new_docx_path, db_path):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    print(patient_id)
+    patient_id = str(patient_id)
+    cursor.execute("""
+        UPDATE visits 
+        SET docx_path = ? 
+        WHERE patient_id = ?
+    """, (str(new_docx_path), patient_id))  # Fix the order here
+
+    conn.commit()
+    conn.close()

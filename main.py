@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -54,6 +55,8 @@ def update_text_in_docx(old_data, new_data):
     text_to_update = {}
     labels = ["טלפון", "גיל", "שם פרטי", "שם משפחה", "תעודת זהות"]
 
+    change_file_name = False  # only specific filed will force to change folder and file names
+
     new_patient_data = {}
     for key in new_data:
         if key == "גיל":
@@ -64,10 +67,13 @@ def update_text_in_docx(old_data, new_data):
             new_patient_data[key] = new_data[key].get()
 
     for i in range(len(labels)):
+        print(old_data[i])
         old_value = str(old_data[i])
         label = labels[i]
         new_value = str(new_patient_data[label])
         if old_value != new_value:
+            if i == 2 or i == 3 or i == 4:
+                change_file_name = True
             text_to_update[old_value] = new_value
 
     # Get the path to the existing .docx file
@@ -103,6 +109,47 @@ def update_text_in_docx(old_data, new_data):
     doc.save(str(file_path))
     print(" Updated and saved document at:", file_path)
 
+    if change_file_name:
+
+        # Create patient folder structure
+        new_patient_folder = patients_base_folder / f"{new_data['שם פרטי'].get()}_{new_data['שם משפחה'].get()}_{new_data['תעודת זהות'].get()}"
+        create_directory(new_patient_folder)  # Using the create_directory function consistently
+        print(new_patient_folder)
+        # Create filename with date included
+        new_file_name = f"{new_data['שם פרטי'].get()}_{new_data['שם משפחה'].get()}_{new_data['תעודת זהות'].get()}.docx"
+        new_file_path = new_patient_folder / new_file_name
+        print(new_file_path)
+        source_path = Path(file_path)
+        destination_path = Path(new_file_path)
+
+        if source_path.exists():
+            shutil.copy(source_path, destination_path)
+            print(f"Copied {source_path} to {destination_path}")
+            db.update_docx_path(new_data['תעודת זהות'].get(), destination_path, db_path)
+
+            # delete process of old path
+            # Delete the file first
+            if file_path.exists() and file_path.is_file():
+                file_path.unlink()
+                print(f"Deleted file: {file_path}")
+
+                # Now check if the parent folder is empty
+                parent_folder = file_path.parent
+                if not any(parent_folder.iterdir()):  # Folder is empty
+                    parent_folder.rmdir()
+                    print(f"Deleted empty folder: {parent_folder}")
+                    messagebox.showinfo("עודכן", "הנתונים עודכנו בהצלחה")
+
+            else:
+                print(f"File does not exist: {file_path}")
+                messagebox.showerror("שגיאה", f"File does not exist: {file_path}")
+
+        else:
+            print(f"File does not exist: {source_path}")
+            messagebox.showerror("שגיאה", f"File does not exist: {source_path}")
+
+    else:
+        messagebox.showinfo("עודכן", "הנתונים עודכנו בהצלחה")
 
 
 def update_age_of_patient_in_docx(old_age, new_age, path):
@@ -259,21 +306,17 @@ def create_docx(f_name, l_name, id_num, age, phone):
     template_path = resource_path('template/Clalit mushlam template.docx')
     doc = DocxTemplate(template_path)
 
-    # Get the current date in the desired format
-    date = datetime.now().strftime('%d-%m-%Y')
-
     # Format phone number - add leading zero if needed
     phone = str(phone)
     if not phone.startswith("0") and len(phone) == 9:
         phone = "0" + phone
-
 
     # Create patient folder structure
     patient_folder = patients_base_folder / f"{f_name}_{l_name}_{id_num}"
     create_directory(patient_folder)  # Using the create_directory function consistently
 
     # Create filename with date included
-    file_name = f"{f_name}_{l_name}_{id_num}_{date}.docx"
+    file_name = f"{f_name}_{l_name}_{id_num}.docx"
     file_path = patient_folder / file_name
 
     # Prepare context for the document
@@ -348,10 +391,11 @@ def adjust_data(tree):
             fields[label_text] = entry_var
 
     def update_everything():
-        db.update_patient_record(fields, patient_id, tree, db_path)
+        db.update_patient_record(fields, patient_id, db_path)
 
         update_text_in_docx(item_data, fields)
         popup.destroy()
+
     # Submit Button to Save Changes
     create_button = ctk.CTkButton(
         popup_frame,
@@ -368,56 +412,55 @@ def create_new_visit(event, tree):
     # Get the selected row (item) that was double-clicked
     selected_item = tree.selection()
 
-    if selected_item:  # If an item is selected
-        # Get the data (values) of the selected row
-        item_data = tree.item(selected_item[0])["values"]
-        # Get the current date in the desired format (e.g., dd-mm-yyyy)
-        current_date = datetime.now().strftime('%d-%m-%Y')  # Use hyphens instead of slashes
-
-        # Create a new window (pop-up)
-        popup = tk.Toplevel()
-        popup.title("ביקור יצירת")
-        # Prevent the window from being resized
-        popup.resizable(False, False)
-        popup_frame = ctk.CTkFrame(popup, fg_color=color1)  # Use ctk.CTkFrame directly
-
-        print(item_data[0])
-        print(item_data[1])
-        print(item_data[2])
-        print(item_data[3])
-        print(item_data[4])
-
-
-        # Last Name
-        new_record_label = ctk.CTkLabel(
-            popup_frame,
-            text=f"? האם ליצור עבור המטופל {item_data[2]} {item_data[3]} ביקור חדש ",
-            font=hebrew_font,
-            anchor="e"
-        )
-        new_record_label.grid(row=0, column=0, columnspan=2, padx=padX_size, pady=padY_size, sticky='nswe')
-
-        confirm_button = ctk.CTkButton(popup_frame,
-                                       text="אישור",
-                                       width=100,
-                                       command=lambda: ((docx_path := create_docx(item_data[2], item_data[3],
-                                                                                  item_data[4], item_data[1],
-                                                                                  item_data[0])),
-                                                        db.insert_visit_record(item_data[4], current_date, docx_path,
-                                                                               db_path),
-                                                        popup.destroy()))
-
-
-        confirm_button.grid(row=1, column=1, sticky='we', padx=10, pady=10)
-
-        denied_button = ctk.CTkButton(popup_frame,
-                                      text="ביטול",
-                                      width=100,
-                                      fg_color="red",
-                                      hover_color="#AF1740",
-                                      command=popup.destroy)
-        denied_button.grid(row=1, column=0, sticky='we', padx=10, pady=10)
-        popup_frame.grid(row=0, column=0, sticky="nsew")
+    # if selected_item:  # If an item is selected
+    #     # Get the data (values) of the selected row
+    #     item_data = tree.item(selected_item[0])["values"]
+    #     # Get the current date in the desired format (e.g., dd-mm-yyyy)
+    #     current_date = datetime.now().strftime('%d-%m-%Y')  # Use hyphens instead of slashes
+    #
+    #     # Create a new window (pop-up)
+    #     popup = tk.Toplevel()
+    #     popup.title("ביקור יצירת")
+    #     # Prevent the window from being resized
+    #     popup.resizable(False, False)
+    #     popup_frame = ctk.CTkFrame(popup, fg_color=color1)  # Use ctk.CTkFrame directly
+    #
+    #     print(item_data[0])
+    #     print(item_data[1])
+    #     print(item_data[2])
+    #     print(item_data[3])
+    #     print(item_data[4])
+    #
+    #     # Last Name
+    #     new_record_label = ctk.CTkLabel(
+    #         popup_frame,
+    #         text=f"? האם ליצור עבור המטופל {item_data[2]} {item_data[3]} ביקור חדש ",
+    #         font=hebrew_font,
+    #         anchor="e"
+    #     )
+    #     new_record_label.grid(row=0, column=0, columnspan=2, padx=padX_size, pady=padY_size, sticky='nswe')
+    #
+    #     confirm_button = ctk.CTkButton(popup_frame,
+    #                                    text="אישור",
+    #                                    width=100,
+    #                                    command=lambda: ((docx_path := create_docx(item_data[2], item_data[3],
+    #                                                                               item_data[4], item_data[1],
+    #                                                                               item_data[0])),
+    #                                                     db.insert_visit_record(item_data[4], current_date, docx_path,
+    #                                                                            db_path),
+    #                                                     popup.destroy()))
+    #
+    #     confirm_button.grid(row=1, column=1, sticky='we', padx=10, pady=10)
+    #
+    #     denied_button = ctk.CTkButton(popup_frame,
+    #                                   text="ביטול",
+    #                                   width=100,
+    #                                   fg_color="red",
+    #                                   hover_color="#AF1740",
+    #                                   command=popup.destroy)
+    #     denied_button.grid(row=1, column=0, sticky='we', padx=10, pady=10)
+    #     popup_frame.grid(row=0, column=0, sticky="nsew")
+    #
 
 
 def load_visit_data(self):
@@ -709,7 +752,6 @@ class PatientForm:
         #  TreeView Frame (Expandable)
         self.search_patients_frame.rowconfigure(1, weight=1)  # Allow row expansion
 
-
         self.patientsTreeFrame = ttk.Frame(self.search_patients_frame)
         self.patientsTreeFrame.grid(row=1, column=0, padx=10, pady=10, columnspan=5, sticky='nswe')
 
@@ -914,7 +956,6 @@ class PatientForm:
 
         # Reinsert matching items with calculated ages
         for row in results:
-
             row_with_age = list(row)
             birthdate_str = row[1]
             row_with_age[1] = calculate_age(birthdate_str)
@@ -923,7 +964,6 @@ class PatientForm:
             row_with_age_str = [str(value) for value in row_with_age]
 
             self.patients_treeview.insert('', 'end', values=row_with_age_str)
-
 
     def collect_data(self):
 
