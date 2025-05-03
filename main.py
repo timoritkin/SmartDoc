@@ -185,32 +185,67 @@ def update_text_in_docx(old_data, new_data):
         messagebox.showinfo("עודכן", "הנתונים עודכנו בהצלחה")
 
 
-def update_age_of_patient_in_docx(old_age, new_age, path):
+def update_age_of_patient_in_docx(age, path):
+    """Update patient age by directly accessing the cell where the age is stored."""
+    from docx import Document
+    from pathlib import Path
+
     file = Path(path)
     if not file.exists():
-        print(" File not found:", file)
-        return
-    if file.suffix.lower() != ".docx":
-        print(" Not a .docx file:", file)
-        return
+        print("File not found:", file)
+        return False
 
     try:
         doc = Document(str(file))
+
+        # Based on the document structure, we know the age is in:
+        # Table #1, Row #2, Cell #5
+        if len(doc.tables) > 0:
+            table = doc.tables[0]  # First table (index 0)
+
+            if len(table.rows) > 1:
+                row = table.rows[1]  # Second row (index 1)
+
+                if len(row.cells) > 4:
+                    age_cell = row.cells[4]  # Fifth cell (index 4)
+
+                    # Get the current age from the cell
+                    current_age = age_cell.text.strip()
+                    print(f"Found age in direct cell: '{current_age}'")
+                    old_age=current_age
+                    # Update the age if it matches the old age
+                    if current_age != age:
+                        # Clear existing content and add new age
+                        for paragraph in age_cell.paragraphs:
+                            for run in paragraph.runs:
+                                if run.text == age:
+                                    run.text = age
+                                    print(f"Updated age from '{old_age}' to '{age}'")
+                                    doc.save(str(file))
+                                    return True
+
+                        # If we didn't find the exact run, replace the entire paragraph
+                        if age_cell.paragraphs:
+                            age_cell.paragraphs[0].clear()
+                            age_cell.paragraphs[0].add_run(age)
+                            print(f"Updated age from '{old_age}' to '{age}' (replaced paragraph)")
+                            doc.save(str(file))
+                            return True
+                    else:
+                        print(f"Cell contains '{current_age}', not '{age}'. No update needed.")
+                else:
+                    print("Row doesn't have enough cells.")
+            else:
+                print("Table doesn't have enough rows.")
+        else:
+            print("No tables found in the document.")
+
+        print("Age not updated.")
+        return False
+
     except Exception as e:
-        print(" Failed to load document:", e)
-        return
-
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                for paragraph in cell.paragraphs:
-                    for run in paragraph.runs:
-                        if old_age in run.text:
-                            run.text = run.text.replace(old_age, new_age)
-
-    # Save the updated document to the same path (overwrite it)
-    doc.save(str(file))
-    print(" Updated and saved document at:", file)
+        print(f"Error updating age: {e}")
+        return False
 
 
 def sort_treeview_column(treeview, column, reverse):
@@ -271,14 +306,16 @@ def open_word_document(event):
         return
     p_id = event.widget.item(selected_item, 'values')[5]
     p_current_age = event.widget.item(selected_item, 'values')[2]  # maybe the age changed
-
     # Retrieve file information
     visit_date = event.widget.item(selected_item, 'values')[0]
     path = db.get_docx_path(p_id, visit_date, db_path)
     p_birthdate = db.get_patient_birthdate(p_id, db_path)
     p_new_age = calculate_age(p_birthdate[0])
-    print(p_current_age)
-    print(p_new_age)
+
+    # Ensure both ages are strings and strip any whitespace
+    p_current_age_str = p_current_age.strip() if isinstance(p_current_age, str) else str(p_current_age)
+
+    print(f"current age: {p_current_age_str}")
     print(path)
 
     # Get the document path from the database
@@ -287,11 +324,7 @@ def open_word_document(event):
     # Resolve the full path for bundled environments
     if path and os.path.exists(path):
         try:
-            if str(p_new_age) != p_current_age:
-                print("there is different age for the patient")
-                update_age_of_patient_in_docx(p_current_age, p_new_age, path)
-            else:
-                print("there is no difference")
+            update_age_of_patient_in_docx(p_current_age_str, path)
 
             # Use the default application to open the file
             if os.name == 'nt':  # Windows
@@ -302,6 +335,7 @@ def open_word_document(event):
                 messagebox.showerror("Error", "Unsupported operating system")
         except Exception as e:
             messagebox.showerror("Error", f"Error opening file: {e}")
+
     else:
         messagebox.showwarning("Warning", "הקובץ לא נמצא")
 
