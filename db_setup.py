@@ -3,15 +3,15 @@ import time
 
 
 # Validate the ID
-def validate_input(patient_id, phone):
-    # Check if ID is a 9-digit integer
-    # if len(patient_id) != 9 or not patient_id.isdigit():
-    #     raise ValueError("תעודת זהות אמורה להכיל 9 מספרים")
-
-    if len(phone) != 10 or not phone.isdigit():
-        raise ValueError("מספר טלפון אמור להכיל 10 מספרים")
-
-    return True
+# def validate_input(patient_id, phone):
+#     # Check if ID is a 9-digit integer
+#     # if len(patient_id) != 9 or not patient_id.isdigit():
+#     #     raise ValueError("תעודת זהות אמורה להכיל 9 מספרים")
+#
+#     if len(phone) != 10 or not phone.isdigit():
+#         raise ValueError("מספר טלפון אמור להכיל 10 מספרים")
+#
+#     return True
 
 
 def create_tables(db_path):
@@ -28,11 +28,11 @@ def create_tables(db_path):
         # If the table doesn't exist, create it
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS patients (
-            patient_id INTEGER (9) PRIMARY KEY,
-            first_name VARCHAR  (50) NOT NULL,
-            last_name VARCHAR (50) NOT NULL,
-            birthdate VARCHAR (11) NOT NULL,
-            phone_number TEXT NOT NULL CHECK (LENGTH(phone_number) = 10)
+            patient_id INTEGER(9) PRIMARY KEY,
+            first_name VARCHAR(50) NOT NULL,
+            last_name VARCHAR(50) NOT NULL,
+            birthdate VARCHAR(11) NOT NULL,
+            phone_number VARCHAR(10) NOT NULL
         )
         """)
 
@@ -116,7 +116,7 @@ def insert_visit_record(ID, current_date, docx_path, db_path):
 def insert_patient_record(first_name, last_name, patient_id, birthdate, phone, db_path):
     """ Inserts a new patient record into the SQLite database. """
     # Validate the patient ID
-    validate_input(patient_id, phone)  # This will raise an error if the ID is invalid
+    # validate_input(patient_id, phone)  # This will raise an error if the ID is invalid
 
     # Connect to the SQLite database
     conn = sqlite3.connect(db_path)
